@@ -700,9 +700,15 @@ mod tests {
         let g = IdGenerator::new();
         let mut d = PresenceDetector::new();
         // 1 high, 1 low (resets), then enough highs.
-        assert!(d.on_window(&window(0, 1_000, 0.0, 0.95, 0.9), &g).is_empty());
-        assert!(d.on_window(&window(1, 2_000, 0.0, 0.05, 0.9), &g).is_empty());
-        assert!(d.on_window(&window(2, 3_000, 0.0, 0.95, 0.9), &g).is_empty());
+        assert!(d
+            .on_window(&window(0, 1_000, 0.0, 0.95, 0.9), &g)
+            .is_empty());
+        assert!(d
+            .on_window(&window(1, 2_000, 0.0, 0.05, 0.9), &g)
+            .is_empty());
+        assert!(d
+            .on_window(&window(2, 3_000, 0.0, 0.95, 0.9), &g)
+            .is_empty());
         let e = d.on_window(&window(3, 4_000, 0.0, 0.95, 0.9), &g);
         assert_eq!(e.len(), 1);
         assert_eq!(e[0].kind, CsiEventKind::PresenceStarted);
@@ -797,14 +803,18 @@ mod tests {
             events.extend(d.on_window(&window_amp(k, (k + 1) * 1_000, vec![1.5; 8]), &g));
         }
         assert!(
-            events.iter().any(|e| e.kind == CsiEventKind::BaselineChanged),
+            events
+                .iter()
+                .any(|e| e.kind == CsiEventKind::BaselineChanged),
             "events = {events:?}"
         );
         // Single huge spike -> AnomalyDetected.
         events.clear();
         events.extend(d.on_window(&window_amp(10, 11_000, vec![50.0; 8]), &g));
         assert!(
-            events.iter().any(|e| e.kind == CsiEventKind::AnomalyDetected),
+            events
+                .iter()
+                .any(|e| e.kind == CsiEventKind::AnomalyDetected),
             "events = {events:?}"
         );
         for e in &events {
@@ -820,8 +830,8 @@ mod tests {
         // wobble around a large baseline must stay quiet.
         let g = IdGenerator::new();
         let mut d = BaselineDriftDetector::new(); // defaults: drift 0.15, anomaly 1.0
-        // A realistic ESP32-ish window: two big "DC/pilot" subcarriers plus a
-        // band of small data subcarriers; ±3 % jitter window to window.
+                                                  // A realistic ESP32-ish window: two big "DC/pilot" subcarriers plus a
+                                                  // band of small data subcarriers; ±3 % jitter window to window.
         let base: Vec<f32> = {
             let mut v = vec![128.0, 110.0];
             v.extend(std::iter::repeat(15.0).take(68));
@@ -835,7 +845,9 @@ mod tests {
             events.extend(d.on_window(&window_amp(k, (k + 1) * 1_000, w), &g));
         }
         assert!(
-            !events.iter().any(|e| e.kind == CsiEventKind::AnomalyDetected),
+            !events
+                .iter()
+                .any(|e| e.kind == CsiEventKind::AnomalyDetected),
             "a ±3% wobble around a large baseline must not be an anomaly; got {events:?}"
         );
         // A 5x jump on the data subcarriers (a person walks in) *is* an anomaly.
@@ -855,9 +867,15 @@ mod tests {
     fn baseline_drift_resets_on_subcarrier_change() {
         let g = IdGenerator::new();
         let mut d = BaselineDriftDetector::new();
-        assert!(d.on_window(&window_amp(0, 1_000, vec![1.0; 8]), &g).is_empty());
+        assert!(d
+            .on_window(&window_amp(0, 1_000, vec![1.0; 8]), &g)
+            .is_empty());
         // Different length -> reset, no event.
-        assert!(d.on_window(&window_amp(1, 2_000, vec![1.0; 16]), &g).is_empty());
-        assert!(d.on_window(&window_amp(2, 3_000, vec![1.0; 16]), &g).is_empty());
+        assert!(d
+            .on_window(&window_amp(1, 2_000, vec![1.0; 16]), &g)
+            .is_empty());
+        assert!(d
+            .on_window(&window_amp(2, 3_000, vec![1.0; 16]), &g)
+            .is_empty());
     }
 }

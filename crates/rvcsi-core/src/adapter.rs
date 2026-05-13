@@ -293,7 +293,10 @@ mod tests {
 
     #[test]
     fn source_config_builder() {
-        let c = SourceConfig::new("nexmon").target("wlan0").channel(6).bandwidth_mhz(20);
+        let c = SourceConfig::new("nexmon")
+            .target("wlan0")
+            .channel(6)
+            .bandwidth_mhz(20);
         assert_eq!(c.source, "nexmon");
         assert_eq!(c.target.as_deref(), Some("wlan0"));
         assert_eq!(c.channel, Some(6));

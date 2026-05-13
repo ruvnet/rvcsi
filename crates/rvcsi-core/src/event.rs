@@ -179,7 +179,9 @@ mod tests {
             vec![WindowId(0)],
         )
         .with_calibration("livingroom@v3")
-        .with_metadata(&M { motion_energy: 1.25 })
+        .with_metadata(&M {
+            motion_energy: 1.25,
+        })
         .unwrap();
         assert_eq!(e.calibration_version.as_deref(), Some("livingroom@v3"));
         assert!(e.metadata_json.contains("1.25"));

@@ -77,7 +77,9 @@ impl QualityScore {
 #[non_exhaustive]
 pub enum ValidationError {
     /// The four parallel vectors disagree in length, or none match `subcarrier_count`.
-    #[error("vector length mismatch: i={i}, q={q}, amp={amp}, phase={phase}, subcarrier_count={sc}")]
+    #[error(
+        "vector length mismatch: i={i}, q={q}, amp={amp}, phase={phase}, subcarrier_count={sc}"
+    )]
     LengthMismatch {
         /// i_values length
         i: usize,
@@ -248,7 +250,10 @@ pub fn validate_frame(
 
     if let Some(rssi) = frame.rssi_dbm {
         if rssi < rssi_lo || rssi > rssi_hi {
-            q.penalize(0.6, format!("rssi {rssi} dBm outside [{rssi_lo},{rssi_hi}]"));
+            q.penalize(
+                0.6,
+                format!("rssi {rssi} dBm outside [{rssi_lo},{rssi_hi}]"),
+            );
         }
     }
 
@@ -256,7 +261,10 @@ pub fn validate_frame(
     let dead = frame.amplitude.iter().filter(|a| **a < 1e-6).count();
     if dead > 0 {
         let frac = dead as f32 / sc.max(1) as f32;
-        q.penalize((1.0 - frac).max(0.05), format!("{dead}/{sc} dead subcarriers"));
+        q.penalize(
+            (1.0 - frac).max(0.05),
+            format!("{dead}/{sc} dead subcarriers"),
+        );
     }
 
     // amplitude spikes (a single subcarrier >> the median magnitude)
@@ -266,7 +274,10 @@ pub fn validate_frame(
         let median = sorted[sc / 2].max(1e-9);
         let max = *sorted.last().unwrap();
         if max > median * 50.0 {
-            q.penalize(0.7, format!("amplitude spike: max {max:.3} vs median {median:.3}"));
+            q.penalize(
+                0.7,
+                format!("amplitude spike: max {max:.3} vs median {median:.3}"),
+            );
         }
     }
 
@@ -325,7 +336,13 @@ mod tests {
     #[test]
     fn clean_frame_is_accepted_with_perfect_quality() {
         let mut f = raw(56).with_rssi(-55);
-        validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Accepted);
         assert_eq!(f.quality_score, 1.0);
         assert!(f.quality_reasons.is_empty());
@@ -335,7 +352,13 @@ mod tests {
     #[test]
     fn missing_rssi_is_a_minor_penalty_not_a_reject() {
         let mut f = raw(56);
-        validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Accepted);
         assert!(f.quality_score < 1.0);
         assert!(f.quality_reasons.iter().any(|r| r.contains("rssi")));
@@ -345,7 +368,13 @@ mod tests {
     fn length_mismatch_is_rejected() {
         let mut f = raw(56);
         f.q_values.pop();
-        let err = validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap_err();
+        let err = validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap_err();
         assert!(matches!(err, ValidationError::LengthMismatch { .. }));
         assert_eq!(f.validation, ValidationStatus::Rejected);
         assert!(!f.is_exposable());
@@ -355,27 +384,63 @@ mod tests {
     fn non_finite_is_rejected() {
         let mut f = raw(4);
         f.amplitude[2] = f32::NAN;
-        let err = validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap_err();
-        assert!(matches!(err, ValidationError::NonFinite { vector: "amplitude", index: 2 }));
+        let err = validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            ValidationError::NonFinite {
+                vector: "amplitude",
+                index: 2
+            }
+        ));
     }
 
     #[test]
     fn subcarrier_count_must_match_profile() {
         let mut f = raw(57); // ESP32 expects 64/128/192
-        let err = validate_frame(&mut f, &AdapterProfile::esp32_default(), &ValidationPolicy::default(), None).unwrap_err();
-        assert!(matches!(err, ValidationError::SubcarrierCount { count: 57, .. }));
+        let err = validate_frame(
+            &mut f,
+            &AdapterProfile::esp32_default(),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            ValidationError::SubcarrierCount { count: 57, .. }
+        ));
     }
 
     #[test]
     fn non_monotonic_time_is_recovered_when_lenient_rejected_when_strict() {
         let mut f = raw(56).with_rssi(-50);
         // lenient
-        validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), Some(2_000)).unwrap();
+        validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            Some(2_000),
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Recovered);
         // strict
         let mut g = raw(56).with_rssi(-50);
-        let policy = ValidationPolicy { strict_monotonic_time: true, ..Default::default() };
-        let err = validate_frame(&mut g, &AdapterProfile::offline(AdapterKind::File), &policy, Some(2_000)).unwrap_err();
+        let policy = ValidationPolicy {
+            strict_monotonic_time: true,
+            ..Default::default()
+        };
+        let err = validate_frame(
+            &mut g,
+            &AdapterProfile::offline(AdapterKind::File),
+            &policy,
+            Some(2_000),
+        )
+        .unwrap_err();
         assert!(matches!(err, ValidationError::NonMonotonicTime { .. }));
     }
 
@@ -385,9 +450,18 @@ mod tests {
         for a in f.amplitude.iter_mut().take(8) {
             *a = 0.0;
         }
-        validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert!(f.quality_score < 0.5);
-        assert!(f.quality_reasons.iter().any(|r| r.contains("dead subcarriers")));
+        assert!(f
+            .quality_reasons
+            .iter()
+            .any(|r| r.contains("dead subcarriers")));
     }
 
     #[test]
@@ -401,12 +475,27 @@ mod tests {
             f
         };
         let mut f = mk();
-        validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Degraded);
 
         let mut g = mk();
-        let policy = ValidationPolicy { degrade_instead_of_reject: false, ..Default::default() };
-        let err = validate_frame(&mut g, &AdapterProfile::offline(AdapterKind::File), &policy, None).unwrap_err();
+        let policy = ValidationPolicy {
+            degrade_instead_of_reject: false,
+            ..Default::default()
+        };
+        let err = validate_frame(
+            &mut g,
+            &AdapterProfile::offline(AdapterKind::File),
+            &policy,
+            None,
+        )
+        .unwrap_err();
         assert!(matches!(err, ValidationError::BelowMinQuality { .. }));
         assert_eq!(g.validation, ValidationStatus::Rejected);
     }
@@ -414,7 +503,13 @@ mod tests {
     #[test]
     fn implausible_rssi_is_hard_reject() {
         let mut f = raw(56).with_rssi(50); // way above 0 + margin
-        let err = validate_frame(&mut f, &AdapterProfile::offline(AdapterKind::File), &ValidationPolicy::default(), None).unwrap_err();
+        let err = validate_frame(
+            &mut f,
+            &AdapterProfile::offline(AdapterKind::File),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap_err();
         assert!(matches!(err, ValidationError::ImplausibleRssi { .. }));
     }
 }

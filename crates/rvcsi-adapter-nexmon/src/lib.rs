@@ -128,10 +128,7 @@ impl NexmonAdapter {
     /// `push_bytes → drain` cycles, which preserves cross-batch state
     /// in a downstream [`crate::rvcsi_runtime::CaptureRuntime`] (presence
     /// state machines, drift baselines, etc).
-    pub fn new_empty(
-        source_id: impl Into<SourceId>,
-        session_id: SessionId,
-    ) -> Self {
+    pub fn new_empty(source_id: impl Into<SourceId>, session_id: SessionId) -> Self {
         debug_assert_eq!(
             shim_abi_version() >> 16,
             1,
@@ -355,7 +352,11 @@ impl NexmonPcapAdapter {
         pcap_bytes: &[u8],
         port: Option<u16>,
     ) -> Result<Self, RvcsiError> {
-        debug_assert_eq!(shim_abi_version() >> 16, 1, "rvcsi_nexmon_shim major ABI mismatch");
+        debug_assert_eq!(
+            shim_abi_version() >> 16,
+            1,
+            "rvcsi_nexmon_shim major ABI mismatch"
+        );
         let source_id = source_id.into();
         let reader = PcapReader::parse(pcap_bytes)?;
         let link_type = reader.link_type();
@@ -389,7 +390,10 @@ impl NexmonPcapAdapter {
         }
         // Count non-CSI UDP packets on other ports as "skipped" too, for health.
         if let Some(p) = want_port {
-            skipped += reader.udp_payloads(None).filter(|(_, dp, _)| *dp != p).count() as u64;
+            skipped += reader
+                .udp_payloads(None)
+                .filter(|(_, dp, _)| *dp != p)
+                .count() as u64;
         }
         let detected_chip = detect_chip(&headers);
         Ok(NexmonPcapAdapter {
@@ -564,7 +568,12 @@ mod tests {
 
         // 56 is not in the default Nexmon profile (64/128/256) → rejected.
         let mut f = frames[0].clone();
-        let err = validate_frame(&mut f, adapter.profile(), &ValidationPolicy::default(), None);
+        let err = validate_frame(
+            &mut f,
+            adapter.profile(),
+            &ValidationPolicy::default(),
+            None,
+        );
         assert!(err.is_err());
 
         // With a permissive profile it validates fine.
@@ -584,7 +593,10 @@ mod tests {
         let bytes = make_record(1, 6, 64, Some(-60));
         let truncated = &bytes[..bytes.len() - 10];
         let err = decode_record(truncated).unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("trunc") || err.to_string().to_lowercase().contains("short"));
+        assert!(
+            err.to_string().to_lowercase().contains("trunc")
+                || err.to_string().to_lowercase().contains("short")
+        );
 
         let mut adapter = NexmonAdapter::from_bytes("t", SessionId(0), truncated.to_vec());
         assert!(adapter.next_frame().is_err());
@@ -674,14 +686,23 @@ mod tests {
         let chanspec = 0xc000u16 | 0x2000 | 36; // 5 GHz, ch 36, 80 MHz
         let nsub = 256u16;
         let recs = vec![
-            (1_000u32, 100_000u32, eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1))),
+            (
+                1_000u32,
+                100_000u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1)),
+            ),
             (1_000u32, 600_000u32, eth_ip_udp(9999, &[0xaa; 8])), // unrelated UDP
-            (1_001u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-61, chanspec, nsub, 2))),
+            (
+                1_001u32,
+                0u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-61, chanspec, nsub, 2)),
+            ),
             (1_001u32, 50_000u32, eth_ip_udp(5500, &[0x42; 30])), // bad nexmon magic -> skipped
         ];
         let pcap = pcap_le_us(LINKTYPE_ETHERNET, &recs);
 
-        let mut adapter = NexmonPcapAdapter::parse("nexmon-pcap", SessionId(9), &pcap, None).unwrap();
+        let mut adapter =
+            NexmonPcapAdapter::parse("nexmon-pcap", SessionId(9), &pcap, None).unwrap();
         assert_eq!(adapter.link_type(), LINKTYPE_ETHERNET);
         assert_eq!(adapter.frame_count(), 2);
         assert_eq!(adapter.headers().len(), 2);
@@ -702,7 +723,10 @@ mod tests {
         assert_eq!(frames[0].rssi_dbm, Some(-58));
         assert_eq!(frames[0].subcarrier_count, nsub);
         // pcap timestamp -> frame timestamp (1000 s + 100000 us)
-        assert_eq!(frames[0].timestamp_ns, 1_000 * 1_000_000_000 + 100_000 * 1_000);
+        assert_eq!(
+            frames[0].timestamp_ns,
+            1_000 * 1_000_000_000 + 100_000 * 1_000
+        );
         assert_eq!(frames[1].timestamp_ns, 1_001 * 1_000_000_000);
 
         let h = adapter.health();
@@ -715,9 +739,15 @@ mod tests {
     fn pcap_adapter_validates_decoded_frames() {
         let pcap = pcap_le_us(
             LINKTYPE_ETHERNET,
-            &[(1u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-60, 0x1000 | 6, 64, 7)))],
+            &[(
+                1u32,
+                0u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-60, 0x1000 | 6, 64, 7)),
+            )],
         );
-        let frames = NexmonPcapAdapter::frames_from_pcap_bytes("p", SessionId(0), &pcap, Some(5500)).unwrap();
+        let frames =
+            NexmonPcapAdapter::frames_from_pcap_bytes("p", SessionId(0), &pcap, Some(5500))
+                .unwrap();
         assert_eq!(frames.len(), 1);
         // 64 sc, channel 6 — accepted by a permissive (offline) profile
         let mut f = frames[0].clone();
@@ -748,8 +778,16 @@ mod tests {
         let pcap = pcap_le_us(
             LINKTYPE_ETHERNET,
             &[
-                (1u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1))),
-                (1u32, 50_000u32, eth_ip_udp(5500, &synth_nexmon_payload(-59, chanspec, nsub, 2))),
+                (
+                    1u32,
+                    0u32,
+                    eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1)),
+                ),
+                (
+                    1u32,
+                    50_000u32,
+                    eth_ip_udp(5500, &synth_nexmon_payload(-59, chanspec, nsub, 2)),
+                ),
             ],
         );
         let adapter = NexmonPcapAdapter::parse("pi5-cap", SessionId(1), &pcap, None).unwrap();
@@ -762,11 +800,19 @@ mod tests {
         assert!(p.accepts_channel(36));
         // 256-sc, ch 36 frame validates fine against the Pi 5 profile
         let mut f = adapter.frames[0].clone();
-        validate_frame(&mut f, &raspberry_pi_profile(RaspberryPiModel::Pi5), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &raspberry_pi_profile(RaspberryPiModel::Pi5),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Accepted);
 
         // explicit override to a Pi 5 also works
-        let a2 = NexmonPcapAdapter::parse("p", SessionId(0), &pcap, None).unwrap().with_pi_model(RaspberryPiModel::Pi5);
+        let a2 = NexmonPcapAdapter::parse("p", SessionId(0), &pcap, None)
+            .unwrap()
+            .with_pi_model(RaspberryPiModel::Pi5);
         assert_eq!(a2.detected_chip(), NexmonChip::Bcm43455c0);
         assert!(a2.profile().chip.as_deref().unwrap().contains("pi5"));
     }
@@ -817,6 +863,10 @@ mod tests {
         let r4 = make_record(4_000, 36, 64, Some(-53));
         a.push_bytes(&r4);
         let f4 = a.next_frame().unwrap().expect("frame 4 after compact");
-        assert_eq!(f4.frame_id, rvcsi_core::FrameId(3), "frame_id monotonicity survives compact");
+        assert_eq!(
+            f4.frame_id,
+            rvcsi_core::FrameId(3),
+            "frame_id monotonicity survives compact"
+        );
     }
 }

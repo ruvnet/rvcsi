@@ -164,26 +164,59 @@ fn main() -> anyhow::Result<()> {
     let stdout = io::stdout();
     let mut out = stdout.lock();
     match cli.command {
-        Command::Record { source, input, output, source_id, session, port, chip } => match source.as_str() {
-            "nexmon" => commands::record_from_nexmon(&mut out, &input, &output, &source_id, session)?,
+        Command::Record {
+            source,
+            input,
+            output,
+            source_id,
+            session,
+            port,
+            chip,
+        } => match source.as_str() {
+            "nexmon" => {
+                commands::record_from_nexmon(&mut out, &input, &output, &source_id, session)?
+            }
             "nexmon-pcap" => commands::record_from_nexmon_pcap(
-                &mut out, &input, &output, &source_id, session, port, chip.as_deref(),
+                &mut out,
+                &input,
+                &output,
+                &source_id,
+                session,
+                port,
+                chip.as_deref(),
             )?,
-            other => anyhow::bail!("unknown --source `{other}` (expected `nexmon` or `nexmon-pcap`)"),
+            other => {
+                anyhow::bail!("unknown --source `{other}` (expected `nexmon` or `nexmon-pcap`)")
+            }
         },
         Command::NexmonChips { json } => commands::nexmon_chips_cmd(&mut out, json)?,
-        Command::InspectNexmon { path, port, json } => commands::inspect_nexmon(&mut out, &path, port, json)?,
-        Command::DecodeChanspec { chanspec, json } => commands::decode_chanspec_cmd(&mut out, &chanspec, json)?,
+        Command::InspectNexmon { path, port, json } => {
+            commands::inspect_nexmon(&mut out, &path, port, json)?
+        }
+        Command::DecodeChanspec { chanspec, json } => {
+            commands::decode_chanspec_cmd(&mut out, &chanspec, json)?
+        }
         Command::Inspect { path, json } => commands::inspect(&mut out, &path, json)?,
-        Command::Replay { path, json, limit, speed } => {
+        Command::Replay {
+            path,
+            json,
+            limit,
+            speed,
+        } => {
             if (speed - 1.0).abs() > f32::EPSILON {
                 eprintln!("note: --speed {speed} is not enforced by the CLI; replaying as fast as possible");
             }
             commands::replay(&mut out, &path, json, limit)?;
         }
-        Command::Stream { input, format, port } => {
+        Command::Stream {
+            input,
+            format,
+            port,
+        } => {
             if format != "json" {
-                anyhow::bail!("unsupported --format `{format}` (only `json` is available in this build)");
+                anyhow::bail!(
+                    "unsupported --format `{format}` (only `json` is available in this build)"
+                );
             }
             if let Some(p) = port {
                 eprintln!("note: --port {p} (WebSocket) needs the rvcsi-daemon; streaming JSON lines to stdout instead");
@@ -191,8 +224,12 @@ fn main() -> anyhow::Result<()> {
             commands::replay(&mut out, &input, true, None)?;
         }
         Command::Events { path, json } => commands::events(&mut out, &path, json)?,
-        Command::Health { source, target } => commands::health(&mut out, &source, target.as_deref())?,
-        Command::Calibrate { input, output } => commands::calibrate(&mut out, &input, output.as_deref())?,
+        Command::Health { source, target } => {
+            commands::health(&mut out, &source, target.as_deref())?
+        }
+        Command::Calibrate { input, output } => {
+            commands::calibrate(&mut out, &input, output.as_deref())?
+        }
         Command::Export { target } => match target {
             ExportTarget::Ruvector(a) => commands::export_ruvector(&mut out, &a.input, &a.output)?,
         },

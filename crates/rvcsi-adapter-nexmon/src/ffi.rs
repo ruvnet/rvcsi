@@ -535,7 +535,7 @@ mod tests {
         assert!(back.q_values[0] < -100.0); // was -inf -> saturated
         assert_eq!(back.q_values[1], 2.0);
         assert_eq!(back.q_values[2], 0.0); // was NaN
-        // And the nexmon-UDP int16 encoder, too.
+                                           // And the nexmon-UDP int16 encoder, too.
         let hdr = synth_header(-60, 0x1000 | 6, 2);
         let p = encode_nexmon_udp(&hdr, &[f32::NAN, 5.0], &[5.0, f32::NAN]).expect("no UB");
         let (_, r) = decode_nexmon_udp(&p, NEXMON_CSI_FMT_INT16_IQ).unwrap();

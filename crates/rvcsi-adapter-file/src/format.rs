@@ -48,7 +48,11 @@ impl CaptureHeader {
     /// no calibration version, `runtime_config_json == "{}"`, and
     /// `created_unix_ns` taken from the system clock (or `0` if it is unavailable
     /// or before the epoch).
-    pub fn new(session_id: SessionId, source_id: SourceId, adapter_profile: AdapterProfile) -> Self {
+    pub fn new(
+        session_id: SessionId,
+        source_id: SourceId,
+        adapter_profile: AdapterProfile,
+    ) -> Self {
         CaptureHeader {
             rvcsi_capture_version: CAPTURE_VERSION,
             session_id,

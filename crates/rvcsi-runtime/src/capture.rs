@@ -54,13 +54,18 @@ impl CaptureRuntime {
 
     /// Open a buffer of "rvCSI Nexmon records" (the napi-c shim format) as the source.
     pub fn open_nexmon_bytes(bytes: Vec<u8>, source_id: &str, session_id: u64) -> Self {
-        let source = NexmonAdapter::from_bytes(SourceId::from(source_id), SessionId(session_id), bytes);
+        let source =
+            NexmonAdapter::from_bytes(SourceId::from(source_id), SessionId(session_id), bytes);
         // Permissive policy: the C-shim records may carry non-default subcarrier counts.
         Self::new(Box::new(source), ValidationPolicy::default())
     }
 
     /// Open a Nexmon capture *file* (concatenated records) as the source.
-    pub fn open_nexmon_file(path: &str, source_id: &str, session_id: u64) -> Result<Self, RvcsiError> {
+    pub fn open_nexmon_file(
+        path: &str,
+        source_id: &str,
+        session_id: u64,
+    ) -> Result<Self, RvcsiError> {
         let bytes = std::fs::read(path)?;
         Ok(Self::open_nexmon_bytes(bytes, source_id, session_id))
     }
@@ -165,7 +170,10 @@ impl CaptureRuntime {
     pub fn health(&self) -> SourceHealth {
         let mut h = self.source.health();
         // Augment the status with the runtime's drop count.
-        let extra = format!("frames_seen={}, frames_dropped={}", self.frames_seen, self.frames_dropped);
+        let extra = format!(
+            "frames_seen={}, frames_dropped={}",
+            self.frames_seen, self.frames_dropped
+        );
         h.status = Some(match h.status {
             Some(s) => format!("{s}; {extra}"),
             None => extra,
@@ -245,7 +253,9 @@ mod tests {
         let mut rec = FileRecorder::create(path, &header).unwrap();
         for k in 0..n {
             let amp_scale = if (k / 8) % 2 == 0 { 0.0 } else { 1.5 };
-            let i: Vec<f32> = (0..32).map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0)).collect();
+            let i: Vec<f32> = (0..32)
+                .map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0))
+                .collect();
             let q: Vec<f32> = (0..32).map(|_| 0.5).collect();
             let mut f = CsiFrame::from_iq(
                 FrameId(k as u64),
@@ -342,7 +352,9 @@ mod tests {
         let nsub = 64u16;
         let frames: Vec<(u64, NexmonCsiHeader, Vec<f32>, Vec<f32>)> = (0..12u64)
             .map(|k| {
-                let i: Vec<f32> = (0..nsub).map(|s| (s as i16 - 32 + k as i16) as f32).collect();
+                let i: Vec<f32> = (0..nsub)
+                    .map(|s| (s as i16 - 32 + k as i16) as f32)
+                    .collect();
                 let q: Vec<f32> = (0..nsub).map(|_| 1.0f32).collect();
                 (
                     1_000_000_000 + k * 50_000_000,
@@ -366,7 +378,8 @@ mod tests {
             })
             .collect();
         let pcap = rvcsi_adapter_nexmon::synthetic_nexmon_pcap(&frames, 5500).unwrap();
-        let mut rt = CaptureRuntime::open_nexmon_pcap_bytes(&pcap, "nexmon-pcap-rt", 1, None).unwrap();
+        let mut rt =
+            CaptureRuntime::open_nexmon_pcap_bytes(&pcap, "nexmon-pcap-rt", 1, None).unwrap();
         let mut got = 0;
         while let Some(f) = rt.next_validated_frame().unwrap() {
             assert_eq!(f.adapter_kind, AdapterKind::Nexmon);

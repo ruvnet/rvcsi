@@ -124,7 +124,10 @@ impl JsonlRfMemory {
                     _ => {
                         return Err(RvcsiError::parse(
                             i + 1,
-                            format!("RF-memory line {} must have exactly one of 'record'/'baseline'", i + 1),
+                            format!(
+                                "RF-memory line {} must have exactly one of 'record'/'baseline'",
+                                i + 1
+                            ),
                         ))
                     }
                 }
@@ -290,15 +293,23 @@ mod tests {
         assert_eq!(reopened.len(), 3);
         let hits = reopened.query_similar(&window_embedding(&w1), 3).unwrap();
         assert!((hits[0].score - 1.0).abs() < 1e-5);
-        let ev_hits = reopened.query_similar(&crate::embedding::event_embedding(&e), 1).unwrap();
+        let ev_hits = reopened
+            .query_similar(&crate::embedding::event_embedding(&e), 1)
+            .unwrap();
         assert_eq!(ev_hits[0].kind, RecordKind::Event);
 
         // baseline persisted
-        let drift = reopened.compute_drift("room1", &base_emb, 0.1).unwrap().unwrap();
+        let drift = reopened
+            .compute_drift("room1", &base_emb, 0.1)
+            .unwrap()
+            .unwrap();
         assert_eq!(drift.baseline_version, "v1");
         assert!(!drift.exceeded);
         assert!(drift.distance < 1e-5);
-        assert!(reopened.compute_drift("other", &base_emb, 0.1).unwrap().is_none());
+        assert!(reopened
+            .compute_drift("other", &base_emb, 0.1)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -381,9 +392,11 @@ mod tests {
             let path = dir.path().join(name);
             let mut mem = JsonlRfMemory::create(&path).unwrap();
             for i in 0..4 {
-                mem.store_window(&window(i, (i as f32 + 1.0) * 2.0)).unwrap();
+                mem.store_window(&window(i, (i as f32 + 1.0) * 2.0))
+                    .unwrap();
             }
-            mem.set_baseline("r", "v1", window_embedding(&window(0, 1.0))).unwrap();
+            mem.set_baseline("r", "v1", window_embedding(&window(0, 1.0)))
+                .unwrap();
             mem.flush().unwrap();
             JsonlRfMemory::open(&path).unwrap()
         };
@@ -391,6 +404,9 @@ mod tests {
         let b = build("b.jsonl");
         assert_eq!(a.len(), b.len());
         let q = window_embedding(&window(1, 4.0));
-        assert_eq!(a.query_similar(&q, 4).unwrap(), b.query_similar(&q, 4).unwrap());
+        assert_eq!(
+            a.query_similar(&q, 4).unwrap(),
+            b.query_similar(&q, 4).unwrap()
+        );
     }
 }

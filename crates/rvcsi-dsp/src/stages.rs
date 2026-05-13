@@ -40,10 +40,12 @@ pub fn variance(xs: &[f32]) -> f32 {
         return 0.0;
     }
     let m = mean(xs);
-    xs.iter().map(|x| {
-        let d = x - m;
-        d * d
-    }).sum::<f32>()
+    xs.iter()
+        .map(|x| {
+            let d = x - m;
+            d * d
+        })
+        .sum::<f32>()
         / xs.len() as f32
 }
 
@@ -319,7 +321,7 @@ mod tests {
         approx(out[0], 2.0);
         approx(out[1], 0.5 * 4.0 + 0.5 * 2.0); // 3.0
         approx(out[2], 0.5 * 8.0 + 0.5 * 3.0); // 5.5
-        // alpha = 1.0 -> copy
+                                               // alpha = 1.0 -> copy
         assert_eq!(ewma(&xs, 1.0), xs.to_vec());
         // clamped: alpha > 1 also a copy
         assert_eq!(ewma(&xs, 5.0), xs.to_vec());

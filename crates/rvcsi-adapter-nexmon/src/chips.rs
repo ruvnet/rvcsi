@@ -61,10 +61,14 @@ impl NexmonChip {
     /// A friendlier display name including a typical host device.
     pub fn description(self) -> &'static str {
         match self {
-            NexmonChip::Bcm43455c0 => "BCM43455c0 / CYW43455 (Raspberry Pi 3B+/4/400/5, Pi Zero W) — 802.11ac, 2.4+5 GHz",
+            NexmonChip::Bcm43455c0 => {
+                "BCM43455c0 / CYW43455 (Raspberry Pi 3B+/4/400/5, Pi Zero W) — 802.11ac, 2.4+5 GHz"
+            }
             NexmonChip::Bcm43436b0 => "BCM43436b0 (Raspberry Pi Zero 2 W) — 802.11n, 2.4 GHz",
             NexmonChip::Bcm4366c0 => "BCM4366c0 (ASUS RT-AC86U) — 802.11ac, 2.4+5 GHz",
-            NexmonChip::Bcm4375b1 => "BCM4375b1 (Samsung Galaxy S10/S20) — 802.11ax-class, 2.4+5 GHz",
+            NexmonChip::Bcm4375b1 => {
+                "BCM4375b1 (Samsung Galaxy S10/S20) — 802.11ax-class, 2.4+5 GHz"
+            }
             NexmonChip::Bcm4358 => "BCM4358 (Nexus 6P) — 802.11ac",
             NexmonChip::Bcm4339 => "BCM4339 (Nexus 5) — 802.11ac",
             NexmonChip::Unknown { .. } => "unknown Broadcom/Cypress chip",
@@ -83,7 +87,11 @@ impl NexmonChip {
     pub fn dual_band(self) -> bool {
         matches!(
             self,
-            NexmonChip::Bcm43455c0 | NexmonChip::Bcm4366c0 | NexmonChip::Bcm4375b1 | NexmonChip::Bcm4358 | NexmonChip::Bcm4339
+            NexmonChip::Bcm43455c0
+                | NexmonChip::Bcm4366c0
+                | NexmonChip::Bcm4375b1
+                | NexmonChip::Bcm4358
+                | NexmonChip::Bcm4339
         )
     }
 
@@ -108,7 +116,9 @@ impl NexmonChip {
     pub fn from_slug(s: &str) -> Option<NexmonChip> {
         let s = s.trim().to_ascii_lowercase();
         match s.as_str() {
-            "bcm43455c0" | "43455c0" | "43455" | "bcm43455" | "cyw43455" => Some(NexmonChip::Bcm43455c0),
+            "bcm43455c0" | "43455c0" | "43455" | "bcm43455" | "cyw43455" => {
+                Some(NexmonChip::Bcm43455c0)
+            }
             "bcm43436b0" | "43436b0" | "43436" | "bcm43436" => Some(NexmonChip::Bcm43436b0),
             "bcm4366c0" | "4366c0" | "4366" | "bcm4366" => Some(NexmonChip::Bcm4366c0),
             "bcm4375b1" | "4375b1" | "4375" | "bcm4375" => Some(NexmonChip::Bcm4375b1),
@@ -121,8 +131,8 @@ impl NexmonChip {
 
 /// 5 GHz UNII channels (a representative set; nexmon picks a control channel via `makecsiparams`).
 const FIVE_GHZ_CHANNELS: &[u16] = &[
-    36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
-    153, 157, 161, 165,
+    36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144,
+    149, 153, 157, 161, 165,
 ];
 
 fn channels_for(chip: NexmonChip) -> Vec<u16> {
@@ -135,7 +145,10 @@ fn channels_for(chip: NexmonChip) -> Vec<u16> {
 
 fn bandwidths_for(chip: NexmonChip) -> Vec<u16> {
     match chip {
-        NexmonChip::Bcm43455c0 | NexmonChip::Bcm4366c0 | NexmonChip::Bcm4358 | NexmonChip::Bcm4339 => vec![20, 40, 80],
+        NexmonChip::Bcm43455c0
+        | NexmonChip::Bcm4366c0
+        | NexmonChip::Bcm4358
+        | NexmonChip::Bcm4339 => vec![20, 40, 80],
         NexmonChip::Bcm4375b1 => vec![20, 40, 80, 160],
         NexmonChip::Bcm43436b0 => vec![20, 40],
         NexmonChip::Unknown { .. } => vec![20, 40, 80],
@@ -221,8 +234,16 @@ impl RaspberryPiModel {
 
     /// Parse a model slug (accepts `pi5`, `pi 5`, `rpi5`, `raspberrypi5`, `pi3b+`/`pi3bplus`, ...).
     pub fn from_slug(s: &str) -> Option<RaspberryPiModel> {
-        let s: String = s.trim().to_ascii_lowercase().chars().filter(|c| !c.is_whitespace() && *c != '_' && *c != '-').collect();
-        let s = s.strip_prefix("raspberrypi").or_else(|| s.strip_prefix("rpi")).unwrap_or(&s);
+        let s: String = s
+            .trim()
+            .to_ascii_lowercase()
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != '_' && *c != '-')
+            .collect();
+        let s = s
+            .strip_prefix("raspberrypi")
+            .or_else(|| s.strip_prefix("rpi"))
+            .unwrap_or(&s);
         match s {
             "pi5" | "5" => Some(RaspberryPiModel::Pi5),
             "pi4" | "4" | "pi4b" => Some(RaspberryPiModel::Pi4),
@@ -303,7 +324,10 @@ mod tests {
         assert_eq!(NexmonChip::from_chip_ver(0x4345), NexmonChip::Bcm43455c0);
         assert_eq!(NexmonChip::from_chip_ver(0x4339), NexmonChip::Bcm4339);
         assert_eq!(NexmonChip::from_chip_ver(0x4366), NexmonChip::Bcm4366c0);
-        assert!(matches!(NexmonChip::from_chip_ver(0xABCD), NexmonChip::Unknown { chip_ver: 0xABCD }));
+        assert!(matches!(
+            NexmonChip::from_chip_ver(0xABCD),
+            NexmonChip::Unknown { chip_ver: 0xABCD }
+        ));
     }
 
     #[test]
@@ -312,8 +336,14 @@ mod tests {
         assert!(!NexmonChip::Bcm4339.uses_int16_iq());
         assert!(NexmonChip::Bcm43455c0.dual_band());
         assert!(!NexmonChip::Bcm43436b0.dual_band());
-        assert_eq!(nexmon_adapter_profile(NexmonChip::Bcm43436b0).supported_bandwidths_mhz, vec![20, 40]);
-        assert_eq!(nexmon_adapter_profile(NexmonChip::Bcm43436b0).expected_subcarrier_counts, vec![64, 128]);
+        assert_eq!(
+            nexmon_adapter_profile(NexmonChip::Bcm43436b0).supported_bandwidths_mhz,
+            vec![20, 40]
+        );
+        assert_eq!(
+            nexmon_adapter_profile(NexmonChip::Bcm43436b0).expected_subcarrier_counts,
+            vec![64, 128]
+        );
         // unknown chip -> a permissive-ish 802.11ac default
         let u = nexmon_adapter_profile(NexmonChip::Unknown { chip_ver: 0 });
         assert_eq!(u.supported_bandwidths_mhz, vec![20, 40, 80]);
@@ -321,12 +351,27 @@ mod tests {
 
     #[test]
     fn slug_parsing() {
-        assert_eq!(NexmonChip::from_slug("CYW43455"), Some(NexmonChip::Bcm43455c0));
-        assert_eq!(NexmonChip::from_slug("bcm4366c0"), Some(NexmonChip::Bcm4366c0));
+        assert_eq!(
+            NexmonChip::from_slug("CYW43455"),
+            Some(NexmonChip::Bcm43455c0)
+        );
+        assert_eq!(
+            NexmonChip::from_slug("bcm4366c0"),
+            Some(NexmonChip::Bcm4366c0)
+        );
         assert_eq!(NexmonChip::from_slug("nope"), None);
-        assert_eq!(RaspberryPiModel::from_slug("Pi 5"), Some(RaspberryPiModel::Pi5));
-        assert_eq!(RaspberryPiModel::from_slug("raspberry-pi-5"), Some(RaspberryPiModel::Pi5));
-        assert_eq!(RaspberryPiModel::from_slug("pi3bplus"), Some(RaspberryPiModel::Pi3BPlus));
+        assert_eq!(
+            RaspberryPiModel::from_slug("Pi 5"),
+            Some(RaspberryPiModel::Pi5)
+        );
+        assert_eq!(
+            RaspberryPiModel::from_slug("raspberry-pi-5"),
+            Some(RaspberryPiModel::Pi5)
+        );
+        assert_eq!(
+            RaspberryPiModel::from_slug("pi3bplus"),
+            Some(RaspberryPiModel::Pi3BPlus)
+        );
         assert_eq!(RaspberryPiModel::from_slug("pi42"), None);
         assert_eq!(NexmonChip::Bcm43455c0.slug(), "bcm43455c0");
         assert_eq!(RaspberryPiModel::Pi5.slug(), "pi5");

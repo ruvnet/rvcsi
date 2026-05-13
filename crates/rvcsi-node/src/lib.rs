@@ -65,8 +65,13 @@ pub fn nexmon_shim_abi_version() -> u32 {
 /// Decode a `Buffer` of "rvCSI Nexmon records" (the napi-c shim format) into a
 /// JSON array of validated `CsiFrame`s. Throws on a malformed record.
 #[napi]
-pub fn nexmon_decode_records(buf: Buffer, source_id: String, session_id: u32) -> napi::Result<String> {
-    let frames = runtime::decode_nexmon_records(buf.as_ref(), &source_id, session_id as u64).map_err(napi_err)?;
+pub fn nexmon_decode_records(
+    buf: Buffer,
+    source_id: String,
+    session_id: u32,
+) -> napi::Result<String> {
+    let frames = runtime::decode_nexmon_records(buf.as_ref(), &source_id, session_id as u64)
+        .map_err(napi_err)?;
     to_json(&frames)
 }
 
@@ -88,8 +93,12 @@ pub fn events_from_capture_file(path: String) -> napi::Result<String> {
 /// Replay a `.rvcsi` capture, window it, and store each window's embedding into
 /// a JSONL RF-memory file; returns the number of windows stored.
 #[napi]
-pub fn export_capture_to_rf_memory(capture_path: String, out_jsonl_path: String) -> napi::Result<u32> {
-    let n = runtime::export_capture_to_rf_memory(&capture_path, &out_jsonl_path).map_err(napi_err)?;
+pub fn export_capture_to_rf_memory(
+    capture_path: String,
+    out_jsonl_path: String,
+) -> napi::Result<u32> {
+    let n =
+        runtime::export_capture_to_rf_memory(&capture_path, &out_jsonl_path).map_err(napi_err)?;
     Ok(n as u32)
 }
 
@@ -107,8 +116,14 @@ pub fn nexmon_decode_pcap(
     port: Option<u16>,
     chip: Option<String>,
 ) -> napi::Result<String> {
-    let frames = runtime::decode_nexmon_pcap_for(pcap.as_ref(), &source_id, session_id as u64, port, chip.as_deref())
-        .map_err(napi_err)?;
+    let frames = runtime::decode_nexmon_pcap_for(
+        pcap.as_ref(),
+        &source_id,
+        session_id as u64,
+        port,
+        chip.as_deref(),
+    )
+    .map_err(napi_err)?;
     to_json(&frames)
 }
 
@@ -146,8 +161,9 @@ pub fn nexmon_chip_name(chip_ver: u32) -> String {
 /// `"bcm43455c0"`, `"raspberry pi 4"`, ...); returns JSON. Throws if unknown.
 #[napi]
 pub fn nexmon_profile(spec: String) -> napi::Result<String> {
-    let p = runtime::nexmon_profile_for(&spec)
-        .ok_or_else(|| napi::Error::from_reason(format!("unknown nexmon chip / Raspberry Pi model `{spec}`")))?;
+    let p = runtime::nexmon_profile_for(&spec).ok_or_else(|| {
+        napi::Error::from_reason(format!("unknown nexmon chip / Raspberry Pi model `{spec}`"))
+    })?;
     to_json(&p)
 }
 
@@ -204,9 +220,14 @@ impl RvcsiRuntime {
 
     /// Open a Nexmon capture file (concatenated rvCSI Nexmon records) as the source.
     #[napi(factory)]
-    pub fn open_nexmon_file(path: String, source_id: String, session_id: u32) -> napi::Result<RvcsiRuntime> {
+    pub fn open_nexmon_file(
+        path: String,
+        source_id: String,
+        session_id: u32,
+    ) -> napi::Result<RvcsiRuntime> {
         Ok(RvcsiRuntime {
-            inner: CaptureRuntime::open_nexmon_file(&path, &source_id, session_id as u64).map_err(napi_err)?,
+            inner: CaptureRuntime::open_nexmon_file(&path, &source_id, session_id as u64)
+                .map_err(napi_err)?,
         })
     }
 

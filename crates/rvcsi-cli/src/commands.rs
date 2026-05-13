@@ -27,11 +27,17 @@ pub fn record_from_nexmon(
     session_id: u64,
 ) -> Result<()> {
     let bytes = std::fs::read(nexmon_path).with_context(|| format!("reading {nexmon_path}"))?;
-    let mut src = NexmonAdapter::from_bytes(SourceId::from(source_id), SessionId(session_id), bytes);
+    let mut src =
+        NexmonAdapter::from_bytes(SourceId::from(source_id), SessionId(session_id), bytes);
     let profile = AdapterProfile::offline(AdapterKind::Nexmon);
     let policy = ValidationPolicy::default();
-    let header = CaptureHeader::new(SessionId(session_id), SourceId::from(source_id), profile.clone());
-    let mut rec = FileRecorder::create(out_path, &header).with_context(|| format!("creating {out_path}"))?;
+    let header = CaptureHeader::new(
+        SessionId(session_id),
+        SourceId::from(source_id),
+        profile.clone(),
+    );
+    let mut rec =
+        FileRecorder::create(out_path, &header).with_context(|| format!("creating {out_path}"))?;
     let (mut written, mut skipped, mut prev_ts) = (0u64, 0u64, None);
     loop {
         match src.next_frame() {
@@ -54,7 +60,10 @@ pub fn record_from_nexmon(
         }
     }
     rec.finish()?;
-    writeln!(out, "recorded {written} frame(s) to {out_path} ({skipped} dropped by validation)")?;
+    writeln!(
+        out,
+        "recorded {written} frame(s) to {out_path} ({skipped} dropped by validation)"
+    )?;
     Ok(())
 }
 
@@ -83,13 +92,18 @@ pub fn record_from_nexmon_pcap(
         None => AdapterProfile::nexmon_default(),
     };
     let header = CaptureHeader::new(SessionId(session_id), SourceId::from(source_id), profile);
-    let mut rec = FileRecorder::create(out_path, &header).with_context(|| format!("creating {out_path}"))?;
+    let mut rec =
+        FileRecorder::create(out_path, &header).with_context(|| format!("creating {out_path}"))?;
     for f in &frames {
         rec.write_frame(f)?;
     }
     rec.finish()?;
     let chip_note = chip.map(|c| format!(" (chip {c})")).unwrap_or_default();
-    writeln!(out, "recorded {} frame(s) from {pcap_path} to {out_path}{chip_note}", frames.len())?;
+    writeln!(
+        out,
+        "recorded {} frame(s) from {pcap_path} to {out_path}{chip_note}",
+        frames.len()
+    )?;
     Ok(())
 }
 
@@ -116,7 +130,13 @@ pub fn nexmon_chips_cmd(out: &mut dyn Write, json: bool) -> Result<()> {
                 "slug": m.slug(), "chip": m.nexmon_chip().slug(), "csi_supported": m.csi_supported(),
             }))
             .collect();
-        writeln!(out, "{}", serde_json::to_string_pretty(&serde_json::json!({ "chips": chips, "raspberry_pi_models": pis }))?)?;
+        writeln!(
+            out,
+            "{}",
+            serde_json::to_string_pretty(
+                &serde_json::json!({ "chips": chips, "raspberry_pi_models": pis })
+            )?
+        )?;
         return Ok(());
     }
     writeln!(out, "Nexmon-supported Broadcom/Cypress chips:")?;
@@ -129,14 +149,32 @@ pub fn nexmon_chips_cmd(out: &mut dyn Write, json: bool) -> Result<()> {
             c.description(),
             p.supported_bandwidths_mhz,
             p.expected_subcarrier_counts,
-            if c.uses_int16_iq() { "" } else { ", legacy packed-float export" }
+            if c.uses_int16_iq() {
+                ""
+            } else {
+                ", legacy packed-float export"
+            }
         )?;
     }
     writeln!(out, "\nRaspberry Pi models:")?;
     for m in known_pi_models() {
         let chip = m.nexmon_chip();
-        let chip_slug = if matches!(chip, NexmonChip::Unknown { .. }) { "(no CSI support)".to_string() } else { chip.slug() };
-        writeln!(out, "  {:<10} -> {}{}", m.slug(), chip_slug, if m.csi_supported() { "" } else { "  [WiFi present but not CSI-capable]" })?;
+        let chip_slug = if matches!(chip, NexmonChip::Unknown { .. }) {
+            "(no CSI support)".to_string()
+        } else {
+            chip.slug()
+        };
+        writeln!(
+            out,
+            "  {:<10} -> {}{}",
+            m.slug(),
+            chip_slug,
+            if m.csi_supported() {
+                ""
+            } else {
+                "  [WiFi present but not CSI-capable]"
+            }
+        )?;
     }
     Ok(())
 }
@@ -144,8 +182,14 @@ pub fn nexmon_chips_cmd(out: &mut dyn Write, json: bool) -> Result<()> {
 /// `rvcsi inspect-nexmon <csi.pcap>` — summarize a nexmon_csi `.pcap` (link
 /// type, CSI frame count, channels, bandwidths, chip versions, RSSI range,
 /// time span). `port` is the CSI UDP port (`None` ⇒ 5500).
-pub fn inspect_nexmon(out: &mut dyn Write, pcap_path: &str, port: Option<u16>, json: bool) -> Result<()> {
-    let s = runtime::summarize_nexmon_pcap(pcap_path, port).with_context(|| format!("inspecting {pcap_path}"))?;
+pub fn inspect_nexmon(
+    out: &mut dyn Write,
+    pcap_path: &str,
+    port: Option<u16>,
+    json: bool,
+) -> Result<()> {
+    let s = runtime::summarize_nexmon_pcap(pcap_path, port)
+        .with_context(|| format!("inspecting {pcap_path}"))?;
     if json {
         writeln!(out, "{}", serde_json::to_string_pretty(&s)?)?;
         return Ok(());
@@ -167,9 +211,18 @@ pub fn inspect_nexmon(out: &mut dyn Write, pcap_path: &str, port: Option<u16>, j
     writeln!(
         out,
         "  chip versions: {}",
-        s.chip_versions.iter().map(|v| format!("0x{v:04x}")).collect::<Vec<_>>().join(", ")
+        s.chip_versions
+            .iter()
+            .map(|v| format!("0x{v:04x}"))
+            .collect::<Vec<_>>()
+            .join(", ")
     )?;
-    writeln!(out, "  chip         : {} (seen: {})", s.detected_chip, s.chip_names.join(", "))?;
+    writeln!(
+        out,
+        "  chip         : {} (seen: {})",
+        s.detected_chip,
+        s.chip_names.join(", ")
+    )?;
     match s.rssi_dbm_range {
         Some((lo, hi)) => writeln!(out, "  rssi range   : {lo} .. {hi} dBm")?,
         None => writeln!(out, "  rssi range   : (none)")?,
@@ -184,7 +237,8 @@ pub fn decode_chanspec_cmd(out: &mut dyn Write, chanspec_str: &str, json: bool) 
     let value: u32 = if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
         u32::from_str_radix(hex, 16).with_context(|| format!("not a hex u16: {s}"))?
     } else {
-        s.parse::<u32>().with_context(|| format!("not a decimal u16: {s}"))?
+        s.parse::<u32>()
+            .with_context(|| format!("not a decimal u16: {s}"))?
     };
     let d = rvcsi_adapter_nexmon::decode_chanspec((value & 0xFFFF) as u16);
     if json {
@@ -230,7 +284,9 @@ pub fn inspect(out: &mut dyn Write, path: &str, json: bool) -> Result<()> {
         "  time span    : {} .. {} ns ({} ns)",
         summary.first_timestamp_ns,
         summary.last_timestamp_ns,
-        summary.last_timestamp_ns.saturating_sub(summary.first_timestamp_ns)
+        summary
+            .last_timestamp_ns
+            .saturating_sub(summary.first_timestamp_ns)
     )?;
     writeln!(out, "  channels     : {:?}", summary.channels)?;
     writeln!(out, "  subcarriers  : {:?}", summary.subcarrier_counts)?;
@@ -241,7 +297,11 @@ pub fn inspect(out: &mut dyn Write, path: &str, json: bool) -> Result<()> {
         "  validation   : accepted={} degraded={} recovered={} rejected={} pending={}",
         b.accepted, b.degraded, b.recovered, b.rejected, b.pending
     )?;
-    writeln!(out, "  calibration  : {}", summary.calibration_version.as_deref().unwrap_or("(none)"))?;
+    writeln!(
+        out,
+        "  calibration  : {}",
+        summary.calibration_version.as_deref().unwrap_or("(none)")
+    )?;
     Ok(())
 }
 
@@ -263,7 +323,10 @@ pub fn replay(out: &mut dyn Write, path: &str, json: bool, limit: Option<usize>)
                 frame.frame_id.value(),
                 frame.timestamp_ns,
                 frame.channel,
-                frame.rssi_dbm.map(|r| r.to_string()).unwrap_or_else(|| "-".into()),
+                frame
+                    .rssi_dbm
+                    .map(|r| r.to_string())
+                    .unwrap_or_else(|| "-".into()),
                 frame.quality_score,
                 frame.validation,
             )?;
@@ -296,8 +359,14 @@ pub fn events(out: &mut dyn Write, path: &str, json: bool) -> Result<()> {
             e.timestamp_ns,
             e.kind.slug(),
             e.confidence,
-            e.evidence_window_ids.iter().map(|w| w.value()).collect::<Vec<_>>(),
-            e.calibration_version.as_deref().map(|c| format!("  calib={c}")).unwrap_or_default(),
+            e.evidence_window_ids
+                .iter()
+                .map(|w| w.value())
+                .collect::<Vec<_>>(),
+            e.calibration_version
+                .as_deref()
+                .map(|c| format!("  calib={c}"))
+                .unwrap_or_default(),
         )?;
     }
     writeln!(out, "-- {} event(s)", evs.len())?;
@@ -326,7 +395,9 @@ pub fn health(out: &mut dyn Write, source: &str, target: Option<&str>) -> Result
         "esp32" | "intel" | "atheros" => {
             anyhow::bail!("live capture for source `{source}` is not available in this build; use the `rvcsi-daemon` (not yet shipped) or replay a `.rvcsi` capture");
         }
-        other => anyhow::bail!("unknown source `{other}` (expected: file, replay, nexmon, esp32, intel, atheros)"),
+        other => anyhow::bail!(
+            "unknown source `{other}` (expected: file, replay, nexmon, esp32, intel, atheros)"
+        ),
     };
     writeln!(out, "{}", serde_json::to_string_pretty(&h)?)?;
     Ok(())
@@ -363,7 +434,10 @@ pub fn calibrate(out: &mut dyn Write, capture: &str, out_path: Option<&str>) -> 
         }
         count += 1;
     }
-    let baseline: Vec<f32> = acc.iter().map(|a| (*a / count.max(1) as f64) as f32).collect();
+    let baseline: Vec<f32> = acc
+        .iter()
+        .map(|a| (*a / count.max(1) as f64) as f32)
+        .collect();
     #[derive(serde::Serialize)]
     struct Baseline<'a> {
         source_id: &'a str,
@@ -384,7 +458,10 @@ pub fn calibrate(out: &mut dyn Write, capture: &str, out_path: Option<&str>) -> 
     let json = serde_json::to_string_pretty(&payload)?;
     if let Some(p) = out_path {
         std::fs::write(p, &json)?;
-        writeln!(out, "wrote baseline ({n} subcarriers, {count} frames) to {p}")?;
+        writeln!(
+            out,
+            "wrote baseline ({n} subcarriers, {count} frames) to {p}"
+        )?;
     } else {
         writeln!(out, "{json}")?;
     }
@@ -406,7 +483,9 @@ mod tests {
         let mut rec = FileRecorder::create(path, &header).unwrap();
         for k in 0..n {
             let amp_scale = if (k / 8) % 2 == 0 { 0.0 } else { 1.5 };
-            let i: Vec<f32> = (0..32).map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0)).collect();
+            let i: Vec<f32> = (0..32)
+                .map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0))
+                .collect();
             let q: Vec<f32> = (0..32).map(|_| 0.5).collect();
             let mut f = CsiFrame::from_iq(
                 FrameId(k as u64),
@@ -556,8 +635,12 @@ mod tests {
         let nsub = 256u16;
         let frames: Vec<(u64, NexmonCsiHeader, Vec<f32>, Vec<f32>)> = (0..8u64)
             .map(|k| {
-                let i: Vec<f32> = (0..nsub).map(|s| (s as i16 - 128 + k as i16) as f32).collect();
-                let q: Vec<f32> = (0..nsub).map(|s| (s as i16 % 5 + k as i16) as f32).collect();
+                let i: Vec<f32> = (0..nsub)
+                    .map(|s| (s as i16 - 128 + k as i16) as f32)
+                    .collect();
+                let q: Vec<f32> = (0..nsub)
+                    .map(|s| (s as i16 % 5 + k as i16) as f32)
+                    .collect();
                 (
                     1_000_000_000 + k * 50_000_000,
                     NexmonCsiHeader {
@@ -602,8 +685,13 @@ mod tests {
         // frames all fit a Raspberry Pi 5 (BCM43455c0)
         let cap_file = tempfile::NamedTempFile::new().unwrap();
         let cap_path = cap_file.path().to_str().unwrap();
-        let out = run(|o| record_from_nexmon_pcap(o, pcap_path, cap_path, "nx-pcap", 3, None, Some("pi5")));
-        assert!(out.contains("recorded 8 frame(s)") && out.contains("chip pi5"), "{out}");
+        let out = run(|o| {
+            record_from_nexmon_pcap(o, pcap_path, cap_path, "nx-pcap", 3, None, Some("pi5"))
+        });
+        assert!(
+            out.contains("recorded 8 frame(s)") && out.contains("chip pi5"),
+            "{out}"
+        );
         let summary = run(|o| inspect(o, cap_path, false));
         assert!(summary.contains("frames       : 8"));
         assert!(summary.contains("source       : nx-pcap"));
@@ -612,11 +700,30 @@ mod tests {
 
         // --chip pizero2w (2.4 GHz only, ≤128 sc) drops every 256-sc frame
         let cap2 = tempfile::NamedTempFile::new().unwrap();
-        let out2 = run(|o| record_from_nexmon_pcap(o, pcap_path, cap2.path().to_str().unwrap(), "z", 0, None, Some("pizero2w")));
+        let out2 = run(|o| {
+            record_from_nexmon_pcap(
+                o,
+                pcap_path,
+                cap2.path().to_str().unwrap(),
+                "z",
+                0,
+                None,
+                Some("pizero2w"),
+            )
+        });
         assert!(out2.contains("recorded 0 frame(s)"), "{out2}");
         // unknown --chip is an error
         let mut buf = Vec::new();
-        assert!(record_from_nexmon_pcap(&mut buf, pcap_path, cap_path, "x", 0, None, Some("not-a-chip")).is_err());
+        assert!(record_from_nexmon_pcap(
+            &mut buf,
+            pcap_path,
+            cap_path,
+            "x",
+            0,
+            None,
+            Some("not-a-chip")
+        )
+        .is_err());
     }
 
     #[test]
@@ -630,7 +737,10 @@ mod tests {
         let chips = v["chips"].as_array().unwrap();
         assert!(chips.iter().any(|c| c["slug"] == "bcm43455c0"));
         let pis = v["raspberry_pi_models"].as_array().unwrap();
-        let pi5 = pis.iter().find(|m| m["slug"] == "pi5").expect("pi5 in listing");
+        let pi5 = pis
+            .iter()
+            .find(|m| m["slug"] == "pi5")
+            .expect("pi5 in listing");
         assert_eq!(pi5["chip"], "bcm43455c0");
         assert_eq!(pi5["csi_supported"], true);
     }
@@ -661,7 +771,16 @@ mod tests {
         assert!(events(&mut buf, "/no/such/file.rvcsi", false).is_err());
         assert!(calibrate(&mut buf, "/no/such/file.rvcsi", None).is_err());
         assert!(record_from_nexmon(&mut buf, "/no/x.bin", "/tmp/y.rvcsi", "s", 0).is_err());
-        assert!(record_from_nexmon_pcap(&mut buf, "/no/x.pcap", "/tmp/y.rvcsi", "s", 0, None, None).is_err());
+        assert!(record_from_nexmon_pcap(
+            &mut buf,
+            "/no/x.pcap",
+            "/tmp/y.rvcsi",
+            "s",
+            0,
+            None,
+            None
+        )
+        .is_err());
         assert!(inspect_nexmon(&mut buf, "/no/such/file.pcap", None, false).is_err());
     }
 }
