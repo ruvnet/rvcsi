@@ -15,10 +15,10 @@ name = "rvcsi"
 path = "src/main.rs"
 
 [dependencies]
-rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
-rvcsi-adapter-file = { path = "../rvcsi-adapter-file", version = "0.3.0" }
-rvcsi-adapter-nexmon = { path = "../rvcsi-adapter-nexmon", version = "0.3.0" }
-rvcsi-runtime = { path = "../rvcsi-runtime", version = "0.3.0" }
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.1" }
+rvcsi-adapter-file = { path = "../rvcsi-adapter-file", version = "0.3.1" }
+rvcsi-adapter-nexmon = { path = "../rvcsi-adapter-nexmon", version = "0.3.1" }
+rvcsi-runtime = { path = "../rvcsi-runtime", version = "0.3.1" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

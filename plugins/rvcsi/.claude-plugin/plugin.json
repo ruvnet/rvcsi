@@ -1,7 +1,7 @@
 {
   "name": "rvcsi",
   "description": "rvCSI — edge RF sensing runtime toolkit for Claude Code: record/transcode WiFi CSI into validated .rvcsi captures, inspect & replay them, run the DSP + event pipeline, decode Nexmon chanspecs, learn calibration baselines, export to RuVector — plus an agent that knows the CsiFrame/CsiWindow/CsiEvent schema, the validation rules, and the CsiSource adapter contract.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "ruvnet",
     "url": "https://github.com/ruvnet/rvcsi"

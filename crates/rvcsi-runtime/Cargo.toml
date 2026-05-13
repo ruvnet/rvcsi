@@ -11,12 +11,12 @@ categories = ["science"]
 readme = "README.md"
 
 [dependencies]
-rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
-rvcsi-dsp = { path = "../rvcsi-dsp", version = "0.3.0" }
-rvcsi-events = { path = "../rvcsi-events", version = "0.3.0" }
-rvcsi-adapter-file = { path = "../rvcsi-adapter-file", version = "0.3.0" }
-rvcsi-adapter-nexmon = { path = "../rvcsi-adapter-nexmon", version = "0.3.0" }
-rvcsi-ruvector = { path = "../rvcsi-ruvector", version = "0.3.0" }
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.1" }
+rvcsi-dsp = { path = "../rvcsi-dsp", version = "0.3.1" }
+rvcsi-events = { path = "../rvcsi-events", version = "0.3.1" }
+rvcsi-adapter-file = { path = "../rvcsi-adapter-file", version = "0.3.1" }
+rvcsi-adapter-nexmon = { path = "../rvcsi-adapter-nexmon", version = "0.3.1" }
+rvcsi-ruvector = { path = "../rvcsi-ruvector", version = "0.3.1" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

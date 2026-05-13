@@ -1,6 +1,6 @@
 {
   "name": "@ruv/rvcsi",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "rvCSI — edge RF sensing runtime: Node.js bindings (napi-rs) over the Rust CSI pipeline (ADR-095, ADR-096)",
   "keywords": ["wifi", "csi", "rf-sensing", "presence", "napi-rs", "rvcsi"],
   "license": "MIT OR Apache-2.0",

@@ -4,6 +4,24 @@ All notable changes to rvCSI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-12
+
+### Fixed
+
+- **`rvcsi-adapter-nexmon`: NaN-safe encode in the napi-c shim.** The C encode
+  helpers `f_to_q88` / `f_to_i16_sat` converted their `float` argument directly to
+  `int16_t`, which is undefined behaviour in C when the value is NaN — a NaN reaching
+  `encode_record` / `encode_nexmon_udp` (e.g. a "synthesize a payload" test path)
+  would hit it. The shim's contract is "never UB": NaN now maps to `0` on encode
+  (`±inf` was already saturation-handled). The decode path was unaffected. Regression
+  test `encode_with_nan_iq_is_well_defined_not_ub` added (`rvcsi-adapter-nexmon`
+  28 → 29 tests; 170 total, 0 failures, clippy-clean). Surfaced by a deep review of
+  the FFI / `unsafe` boundary — the rest of which checked out clean (bounds-checked
+  C, ABI-versioned + `debug_assert`ed, `#[repr(C)]` layouts matched, every `unsafe`
+  block documented + length-checked, the pure-Rust libpcap reader guards every slice).
+- All `rvcsi-*` crates bumped 0.3.0 → 0.3.1 in lockstep (workspace version);
+  `^0.3` consumers pick up 0.3.1 automatically.
+
 ## [0.3.0] — 2026-05-12
 
 First public release. rvCSI was incubated inside the
