@@ -1,0 +1,21 @@
+[package]
+name = "rvcsi-ruvector"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "rvCSI RuVector bridge — exports temporal RF embeddings + event metadata as a queryable RF-memory store (ADR-095 FR8, D8)"
+repository.workspace = true
+keywords = ["wifi", "csi", "ruvector", "rvcsi"]
+categories = ["science"]
+readme = "README.md"
+
+[dependencies]
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = "3.10"

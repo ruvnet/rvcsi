@@ -1,0 +1,20 @@
+[package]
+name = "rvcsi-adapter-nexmon"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "rvCSI Nexmon adapter — wraps the isolated napi-c shim that parses Nexmon CSI UDP/PCAP records into normalized CsiFrames (ADR-095 D2/D15, ADR-096)"
+repository.workspace = true
+keywords = ["wifi", "csi", "nexmon", "rvcsi"]
+categories = ["science"]
+readme = "README.md"
+build = "build.rs"
+links = "rvcsi_nexmon_shim"
+
+[dependencies]
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
+thiserror = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }

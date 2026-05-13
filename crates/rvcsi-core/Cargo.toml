@@ -1,0 +1,19 @@
+[package]
+name = "rvcsi-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "rvCSI core — normalized CsiFrame/CsiWindow/CsiEvent schema, AdapterProfile, CsiSource trait, validation pipeline (ADR-095, ADR-096)"
+repository.workspace = true
+keywords = ["wifi", "csi", "rf-sensing", "rvcsi"]
+categories = ["science"]
+readme = "README.md"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

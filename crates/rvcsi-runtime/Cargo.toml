@@ -1,0 +1,24 @@
+[package]
+name = "rvcsi-runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "rvCSI runtime composition — wires a CsiSource + DSP + the event pipeline + RuVector export; the shared layer under rvcsi-node and rvcsi-cli (ADR-096)"
+repository.workspace = true
+keywords = ["wifi", "csi", "rvcsi", "runtime"]
+categories = ["science"]
+readme = "README.md"
+
+[dependencies]
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
+rvcsi-dsp = { path = "../rvcsi-dsp", version = "0.3.0" }
+rvcsi-events = { path = "../rvcsi-events", version = "0.3.0" }
+rvcsi-adapter-file = { path = "../rvcsi-adapter-file", version = "0.3.0" }
+rvcsi-adapter-nexmon = { path = "../rvcsi-adapter-nexmon", version = "0.3.0" }
+rvcsi-ruvector = { path = "../rvcsi-ruvector", version = "0.3.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.10"

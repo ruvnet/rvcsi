@@ -1,0 +1,35 @@
+{
+  "name": "@ruv/rvcsi",
+  "version": "0.3.0",
+  "description": "rvCSI — edge RF sensing runtime: Node.js bindings (napi-rs) over the Rust CSI pipeline (ADR-095, ADR-096)",
+  "keywords": ["wifi", "csi", "rf-sensing", "presence", "napi-rs", "rvcsi"],
+  "license": "MIT OR Apache-2.0",
+  "repository": "https://github.com/ruvnet/rvcsi",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "engines": {
+    "node": ">=14"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "binding.js",
+    "binding.d.ts",
+    "README.md",
+    "*.node"
+  ],
+  "napi": {
+    "name": "rvcsi-node",
+    "triples": {
+      "defaults": true
+    }
+  },
+  "scripts": {
+    "build": "napi build --platform --release --js binding.js --dts binding.d.ts",
+    "build:debug": "napi build --platform --js binding.js --dts binding.d.ts",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  }
+}

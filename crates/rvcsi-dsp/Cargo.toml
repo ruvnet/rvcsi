@@ -1,0 +1,19 @@
+[package]
+name = "rvcsi-dsp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "rvCSI DSP — reusable signal-processing stages (DC removal, phase unwrap, smoothing, Hampel, variance, baseline, motion energy, presence) (ADR-095 FR4)"
+repository.workspace = true
+keywords = ["wifi", "csi", "dsp", "rvcsi"]
+categories = ["science"]
+readme = "README.md"
+
+[dependencies]
+rvcsi-core = { path = "../rvcsi-core", version = "0.3.0" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

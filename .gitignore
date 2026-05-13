@@ -1,0 +1,31 @@
+# Rust
+/target
+**/target/
+Cargo.lock.bak
+*.pdb
+
+# napi-rs / Node addon build output
+*.node
+crates/rvcsi-node/binding.js
+crates/rvcsi-node/binding.d.ts
+node_modules/
+npm-debug.log*
+
+# C shim build artifacts
+crates/rvcsi-adapter-nexmon/native/*.o
+
+# Local Claude config (may contain machine-specific paths / credentials)
+CLAUDE.local.md
+.swarm/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local capture / scratch data
+*.rvcsi
+*.pcap
+*.csi.jsonl
+/scratch/

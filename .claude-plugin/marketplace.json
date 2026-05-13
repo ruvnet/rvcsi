@@ -1,0 +1,15 @@
+{
+  "name": "rvcsi",
+  "description": "rvCSI marketplace: a Claude Code plugin for the edge RF sensing runtime — capture, validate, inspect, replay, run the DSP + event pipeline, decode Nexmon CSI, and work with the CsiFrame/CsiWindow/CsiEvent schema.",
+  "owner": {
+    "name": "ruvnet",
+    "url": "https://github.com/ruvnet/rvcsi"
+  },
+  "plugins": [
+    {
+      "name": "rvcsi",
+      "source": "./plugins/rvcsi",
+      "description": "rvCSI toolkit: record/transcode CSI into validated .rvcsi captures, inspect them, replay them, run the DSP + event pipeline (presence/motion/anomaly/baseline-drift), decode Broadcom chanspecs and list Nexmon chips, learn calibration baselines, export to RuVector RF memory — plus an agent that knows the normalized schema, the validation rules, and the CsiSource adapter contract (ADR-095, ADR-096)."
+    }
+  ]
+}
