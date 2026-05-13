@@ -75,9 +75,13 @@ as a `vendor/rvcsi` submodule.
 
 ### Notes
 
-- 169 tests across the rvcsi crates (core 29, dsp 28, events 19, adapter-file 20 +
-  1 doctest, adapter-nexmon 28, ruvector 20 + 1 doctest, runtime 13, cli 10),
+- 170 tests across the rvcsi crates (core 29, dsp 28, events 19, adapter-file 20 +
+  1 doctest, adapter-nexmon 29, ruvector 20 + 1 doctest, runtime 13, cli 10),
   0 failures; all crates build together and are clippy-clean.
+- napi-c shim hardening (FFI-boundary review): the encode helpers (`f_to_q88` /
+  `f_to_i16_sat`) now map a NaN input to `0` instead of converting NaN directly to
+  an integer (which is undefined behaviour in C); the contract is "never UB". The
+  decode path was unaffected. Regression test in `rvcsi-adapter-nexmon::ffi`.
 - Validated end-to-end against a real 7,000-frame ESP32 CSI capture: `rvcsi inspect`
   / `replay` / `calibrate` / `events` all run on real hardware data.
 - Not yet shipped: `rvcsi-adapter-esp32` (live ESP32 serial/UDP source), `rvcsi-daemon`

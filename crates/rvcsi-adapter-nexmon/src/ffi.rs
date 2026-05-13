@@ -512,6 +512,38 @@ mod tests {
     }
 
     #[test]
+    fn encode_with_nan_iq_is_well_defined_not_ub() {
+        // Converting a NaN float directly to an integer is UB in C; the shim
+        // must map it to 0 on encode rather than invoke UB. (Regression for the
+        // FFI-boundary review.)
+        let rec = NexmonRecord {
+            subcarrier_count: 3,
+            channel: 6,
+            bandwidth_mhz: 20,
+            rssi_dbm: Some(-60),
+            noise_floor_dbm: None,
+            timestamp_ns: 1,
+            i_values: vec![1.0, f32::NAN, f32::INFINITY],
+            q_values: vec![f32::NEG_INFINITY, 2.0, f32::NAN],
+        };
+        let bytes = encode_record(&rec).expect("encode must not panic/UB on NaN");
+        let (back, _) = decode_record(&bytes).unwrap();
+        // NaN slots came back as 0.0 (Q8.8 0/256); inf saturated to the rail.
+        assert_eq!(back.i_values[0], 1.0);
+        assert_eq!(back.i_values[1], 0.0); // was NaN
+        assert!(back.i_values[2] > 100.0); // was +inf -> saturated
+        assert!(back.q_values[0] < -100.0); // was -inf -> saturated
+        assert_eq!(back.q_values[1], 2.0);
+        assert_eq!(back.q_values[2], 0.0); // was NaN
+        // And the nexmon-UDP int16 encoder, too.
+        let hdr = synth_header(-60, 0x1000 | 6, 2);
+        let p = encode_nexmon_udp(&hdr, &[f32::NAN, 5.0], &[5.0, f32::NAN]).expect("no UB");
+        let (_, r) = decode_nexmon_udp(&p, NEXMON_CSI_FMT_INT16_IQ).unwrap();
+        assert_eq!(r.i_values, vec![0.0, 5.0]);
+        assert_eq!(r.q_values, vec![5.0, 0.0]);
+    }
+
+    #[test]
     fn rejects_zero_subcarriers_on_encode() {
         let rec = NexmonRecord {
             subcarrier_count: 0,

@@ -42,9 +42,16 @@ static void st_u64(uint8_t *p, uint64_t v) {
 }
 static void st_i16(uint8_t *p, int16_t v) { st_u16(p, (uint16_t)v); }
 
+/* `f != f` is true iff `f` is NaN — portable without <math.h>. We map NaN to 0
+ * on encode: converting a NaN directly to an integer type is undefined behaviour
+ * in C, and this shim's contract is "never UB". (+/-inf is already handled by
+ * the saturation branches below: inf*256 == inf >= 32767.) */
+#define RVCSI_NX_IS_NAN(f) ((f) != (f))
+
 /* Q8.8 fixed-point <-> float, with saturation on encode (rvCSI record format). */
 static float q88_to_f(int16_t v) { return (float)v / 256.0f; }
 static int16_t f_to_q88(float f) {
+  if (RVCSI_NX_IS_NAN(f)) return 0;
   float scaled = f * 256.0f;
   if (scaled >= 32767.0f) return (int16_t)32767;
   if (scaled <= -32768.0f) return (int16_t)-32768;
@@ -54,6 +61,7 @@ static int16_t f_to_q88(float f) {
 
 /* Plain int16 <-> float for the raw nexmon_csi int16 I/Q export. */
 static int16_t f_to_i16_sat(float f) {
+  if (RVCSI_NX_IS_NAN(f)) return 0;
   if (f >= 32767.0f) return (int16_t)32767;
   if (f <= -32768.0f) return (int16_t)-32768;
   if (f >= 0.0f) return (int16_t)(f + 0.5f);

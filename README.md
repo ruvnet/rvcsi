@@ -4,7 +4,7 @@
 
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Tests: 169](https://img.shields.io/badge/tests-169%20passed-brightgreen.svg)](#testing)
+[![Tests: 170](https://img.shields.io/badge/tests-170%20passed-brightgreen.svg)](#testing)
 [![crates.io](https://img.shields.io/crates/v/rvcsi-core.svg)](https://crates.io/crates/rvcsi-core)
 [![npm](https://img.shields.io/npm/v/@ruv/rvcsi.svg)](https://www.npmjs.com/package/@ruv/rvcsi)
 
@@ -124,7 +124,7 @@ Then: `/rvcsi-inspect <file.rvcsi>`, `/rvcsi-events <file.rvcsi>`, `/rvcsi-recor
 
 ```bash
 cargo build --workspace
-cargo test  --workspace          # 169 tests, 0 failures
+cargo test  --workspace          # 170 tests, 0 failures
 cargo clippy --workspace         # clippy-clean
 ```
 
