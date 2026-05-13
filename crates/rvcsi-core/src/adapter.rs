@@ -244,6 +244,29 @@ pub trait CsiSource: Send {
     fn stop(&mut self) -> Result<(), RvcsiError> {
         Ok(())
     }
+
+    /// Feed more bytes to a streaming-capable source. Default
+    /// implementation returns `Adapter` error — only file/replay-style
+    /// sources that own an internal buffer (currently `NexmonAdapter`
+    /// when constructed via `new_empty`) override this.
+    ///
+    /// Returns the post-push internal buffer length so callers can
+    /// monitor memory pressure. See [`Self::compact_buffer`] for the
+    /// matching reclaim hook.
+    fn push_bytes(&mut self, _more: &[u8]) -> Result<usize, RvcsiError> {
+        Err(RvcsiError::adapter(
+            "source",
+            "push_bytes not supported by this source",
+        ))
+    }
+
+    /// Reclaim memory consumed by already-delivered frames in sources
+    /// that buffer internally. Default: no-op (returns 0 bytes freed).
+    /// Streaming-capable sources override to drop the consumed prefix
+    /// of their internal buffer.
+    fn compact_buffer(&mut self) -> usize {
+        0
+    }
 }
 
 #[cfg(test)]

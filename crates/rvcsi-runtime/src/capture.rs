@@ -182,6 +182,51 @@ impl CaptureRuntime {
     pub fn frames_dropped(&self) -> u64 {
         self.frames_dropped
     }
+
+    /// Feed more bytes to the underlying source (live-capture path).
+    /// Forwards to [`CsiSource::push_bytes`]; sources that don't
+    /// support streaming return an `Adapter` error.
+    ///
+    /// Designed for the live-capture use case: a single long-lived
+    /// CaptureRuntime built via `open_nexmon_bytes(Vec::new(), ...)`
+    /// (or via [`Self::open_nexmon_streaming`]) can have records
+    /// appended as they arrive from the radio. The internal
+    /// EventPipeline state — presence/motion state machines, drift
+    /// baselines — persists across pushes, eliminating the
+    /// cross-batch state loss of the per-batch-CaptureRuntime
+    /// workaround pattern.
+    pub fn push_bytes(&mut self, more: &[u8]) -> Result<usize, RvcsiError> {
+        self.source.push_bytes(more)
+    }
+
+    /// Compact the underlying source's internal buffer (drops the
+    /// already-consumed prefix). No-op for sources that don't buffer.
+    /// Recommended cadence for live capture: after every drain cycle,
+    /// or whenever `health().status` shows a buffer growing large.
+    pub fn compact_buffer(&mut self) -> usize {
+        self.source.compact_buffer()
+    }
+
+    /// Convenience constructor for streaming live-capture from a
+    /// nexmon source: builds a [`NexmonAdapter`] with an empty buffer,
+    /// then wraps it in a [`CaptureRuntime`]. The caller drives
+    /// capture via:
+    ///
+    /// ```ignore
+    /// let mut rt = CaptureRuntime::open_nexmon_streaming("pi-1", 42);
+    /// loop {
+    ///     let (n, _) = socket.recv_from(&mut buf).await?;
+    ///     if let Ok((_, rec)) = decode_nexmon_udp(&buf[..n], FMT) {
+    ///         rt.push_bytes(&encode_record(&rec)?)?;
+    ///     }
+    ///     while let Some(frame) = rt.next_clean_frame()? { ... }
+    ///     for ev in rt.drain_events()? { ... }
+    ///     rt.compact_buffer();
+    /// }
+    /// ```
+    pub fn open_nexmon_streaming(source_id: &str, session_id: u64) -> Self {
+        Self::open_nexmon_bytes(Vec::new(), source_id, session_id)
+    }
 }
 
 #[cfg(test)]
@@ -346,5 +391,82 @@ mod tests {
         assert!(CaptureRuntime::open_nexmon_file("/nope/x.bin", "s", 0).is_err());
         assert!(CaptureRuntime::open_nexmon_pcap("/nope/x.pcap", "s", 0, None).is_err());
         assert!(CaptureRuntime::open_nexmon_pcap_bytes(&[0u8; 8], "s", 0, None).is_err());
+    }
+
+    fn make_nexmon_record(ts: u64, ch: u16, n: usize, rssi: Option<i16>) -> Vec<u8> {
+        let i: Vec<f32> = (0..n).map(|k| (k as f32) * 0.5).collect();
+        let q: Vec<f32> = (0..n).map(|k| -(k as f32) * 0.25).collect();
+        let rec = NexmonRecord {
+            subcarrier_count: n as u16,
+            channel: ch,
+            bandwidth_mhz: 80,
+            rssi_dbm: rssi,
+            noise_floor_dbm: Some(-92),
+            timestamp_ns: ts,
+            i_values: i,
+            q_values: q,
+        };
+        encode_record(&rec).expect("encode")
+    }
+
+    #[test]
+    fn streaming_push_drain_cycle() {
+        // Live-capture flow: open_nexmon_streaming → push_bytes records
+        // arriving from the radio → drain frames → compact. The whole
+        // point of the streaming API is that a SINGLE CaptureRuntime
+        // serves the entire session, so EventPipeline state (presence
+        // state machines, drift baselines) persists across pushes.
+        let mut rt = CaptureRuntime::open_nexmon_streaming("live-pi", 999);
+        assert_eq!(rt.frames_seen(), 0);
+
+        // Pre-push: stream is empty, next_validated_frame yields None.
+        assert!(rt.next_validated_frame().unwrap().is_none());
+
+        // Push 3 records, drain.
+        let mut chunk = Vec::new();
+        for k in 0..3 {
+            chunk.extend_from_slice(&make_nexmon_record(1_000 + k * 1_000, 36, 64, Some(-50)));
+        }
+        let post_push_len = rt.push_bytes(&chunk).unwrap();
+        assert_eq!(post_push_len, chunk.len());
+
+        let mut drained = 0;
+        while let Some(_f) = rt.next_validated_frame().unwrap() {
+            drained += 1;
+        }
+        assert_eq!(drained, 3, "should drain all 3 pushed records");
+        assert_eq!(rt.frames_seen(), 3);
+
+        // Stream is empty again — pushing more should keep working.
+        assert!(rt.next_validated_frame().unwrap().is_none());
+
+        // compact reclaims memory; new pushes still work afterwards.
+        let freed = rt.compact_buffer();
+        assert!(freed > 0, "compact should reclaim consumed bytes");
+
+        let more = make_nexmon_record(5_000, 36, 64, Some(-55));
+        rt.push_bytes(&more).unwrap();
+        assert!(rt.next_validated_frame().unwrap().is_some());
+
+        // Drain accumulated events — at minimum should not error.
+        let _events = rt.drain_events().unwrap();
+    }
+
+    #[test]
+    fn push_bytes_unsupported_on_file_source() {
+        // File-source CaptureRuntime can't accept pushes — verifies
+        // the default trait impl returns Adapter error rather than
+        // silently no-op'ing.
+        let tmp = std::env::temp_dir().join("rvcsi_streaming_test_unsupported.rvcsi");
+        write_capture(&tmp, 4);
+        let mut rt = CaptureRuntime::open_capture_file(tmp.to_str().unwrap()).unwrap();
+        let err = rt.push_bytes(b"nope").unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("push_bytes not supported") || msg.contains("not supported"),
+            "expected unsupported-push error, got: {msg}"
+        );
+        // compact_buffer is no-op for non-streaming sources, returns 0.
+        assert_eq!(rt.compact_buffer(), 0);
     }
 }

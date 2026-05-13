@@ -292,6 +292,20 @@ impl CsiSource for NexmonAdapter {
             status: self.status.clone(),
         }
     }
+
+    /// Streaming-capable: forwards to the inherent
+    /// [`NexmonAdapter::push_bytes`]. Lets `CaptureRuntime` push
+    /// records to a long-lived adapter without knowing the concrete
+    /// source type.
+    fn push_bytes(&mut self, more: &[u8]) -> Result<usize, RvcsiError> {
+        Ok(NexmonAdapter::push_bytes(self, more))
+    }
+
+    /// Streaming-capable: forwards to the inherent
+    /// [`NexmonAdapter::compact`].
+    fn compact_buffer(&mut self) -> usize {
+        NexmonAdapter::compact(self)
+    }
 }
 
 /// A [`CsiSource`] that reads the *real* nexmon_csi UDP payloads out of a
