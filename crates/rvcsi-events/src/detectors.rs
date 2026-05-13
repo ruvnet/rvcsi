@@ -619,6 +619,11 @@ impl EventDetector for BaselineDriftDetector {
 }
 
 #[cfg(test)]
+// `repeat().take(N)` in test fixtures here predates std::iter::repeat_n
+// (stable since Rust 1.91). The workspace MSRV is 1.85 per the
+// README badge; rewriting to repeat_n would bump MSRV unnecessarily
+// for an aesthetic lint. Allow the lint inside test code only.
+#[allow(clippy::manual_repeat_n)]
 mod tests {
     use super::*;
     use rvcsi_core::{SessionId, SourceId};
