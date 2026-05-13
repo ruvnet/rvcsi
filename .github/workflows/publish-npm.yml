@@ -1,0 +1,57 @@
+# Publish @ruv/rvcsi to npm when a version tag (v*) is pushed.
+#
+# Uses npm OIDC Trusted Publishing — no NPM_TOKEN secret. One-time setup on
+# npmjs.com: add this repo (ruvnet/rvcsi) + this workflow filename
+# (publish-npm.yml) as a Trusted Publisher for the @ruv/rvcsi package.
+# See https://docs.npmjs.com/trusted-publishers
+#
+# This builds the napi-rs native addon for the runner's platform only
+# (linux-x64-gnu) and publishes it as `latest`. A proper cross-platform release
+# (a build matrix + `napi prepublish` per-triple packages) is a follow-up.
+
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required for npm OIDC (Trusted Publishers)
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/rvcsi-node
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'                       # Trusted Publishing needs Node 22.14+
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Use latest npm (Trusted Publishing needs npm 11.5.1+)
+        run: npm install -g npm@latest
+
+      - name: Install (@napi-rs/cli)
+        run: npm install
+
+      - name: Build the native addon
+        run: npm run build        # napi build --platform --release --js binding.js --dts binding.d.ts
+
+      - name: Smoke test
+        run: npm test
+
+      - name: Publish @ruv/rvcsi
+        run: npm publish --access public
+        # OIDC auth — the workflow must be registered as a Trusted Publisher on npm.
