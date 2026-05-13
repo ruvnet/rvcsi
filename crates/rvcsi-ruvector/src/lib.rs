@@ -50,8 +50,7 @@ mod memory;
 mod store;
 
 pub use embedding::{
-    cosine_similarity, event_embedding, window_embedding, EVENT_EMBEDDING_DIM,
-    WINDOW_EMBEDDING_DIM,
+    cosine_similarity, event_embedding, window_embedding, EVENT_EMBEDDING_DIM, WINDOW_EMBEDDING_DIM,
 };
 pub use jsonl::JsonlRfMemory;
 pub use memory::InMemoryRfMemory;

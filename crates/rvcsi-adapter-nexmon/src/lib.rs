@@ -116,6 +116,85 @@ impl NexmonAdapter {
         Ok(Self::from_bytes(source_id, session_id, bytes))
     }
 
+    /// Build an adapter with an empty internal buffer, suitable for live
+    /// capture flows that push records as they arrive (UDP `5500` recv
+    /// loops, serial readers, etc.). Pair with [`Self::push_bytes`] and
+    /// drive iteration with [`crate::CsiSource::next_frame`] — when the
+    /// cursor catches up, `next_frame` returns `Ok(None)` and the caller
+    /// can `push_bytes` more records before resuming.
+    ///
+    /// Internally this avoids the file/buffer-consumed lifecycle of
+    /// [`Self::from_bytes`]: the adapter stays usable across many
+    /// `push_bytes → drain` cycles, which preserves cross-batch state
+    /// in a downstream [`crate::rvcsi_runtime::CaptureRuntime`] (presence
+    /// state machines, drift baselines, etc).
+    pub fn new_empty(source_id: impl Into<SourceId>, session_id: SessionId) -> Self {
+        debug_assert_eq!(
+            shim_abi_version() >> 16,
+            1,
+            "rvcsi_nexmon_shim major ABI mismatch"
+        );
+        NexmonAdapter {
+            source_id: source_id.into(),
+            session_id,
+            profile: AdapterProfile::nexmon_default(),
+            buf: Vec::new(),
+            cursor: 0,
+            next_frame_id: 0,
+            delivered: 0,
+            rejected: 0,
+            status: None,
+        }
+    }
+
+    /// Append one or more concatenated records to the adapter's internal
+    /// buffer. The cursor is **not** rewound — already-delivered frames
+    /// stay delivered. Designed for live producers (UDP recv loops) where
+    /// records arrive in small chunks and the consumer iterates via
+    /// `next_frame` between pushes.
+    ///
+    /// Returns the new total buffer length (post-append) so callers can
+    /// monitor memory pressure and compact if needed via
+    /// [`Self::compact`].
+    ///
+    /// Empty `more` is a no-op.
+    pub fn push_bytes(&mut self, more: &[u8]) -> usize {
+        if !more.is_empty() {
+            self.buf.extend_from_slice(more);
+        }
+        self.buf.len()
+    }
+
+    /// Reclaim memory by dropping bytes that have already been consumed
+    /// by the cursor. Safe to call any time; resets the cursor to 0 and
+    /// leaves only `buf[cursor..]` (pending records) in the internal
+    /// buffer. Returns the number of bytes freed.
+    ///
+    /// Intended for long-running live-capture loops where the adapter
+    /// would otherwise accumulate the entire session's worth of bytes
+    /// in memory. Recommended cadence: every push_bytes + drain cycle,
+    /// or whenever `cursor` exceeds a megabyte.
+    pub fn compact(&mut self) -> usize {
+        if self.cursor == 0 {
+            return 0;
+        }
+        let freed = self.cursor;
+        self.buf.drain(..self.cursor);
+        self.cursor = 0;
+        freed
+    }
+
+    /// Current cursor position (bytes consumed from the internal buffer).
+    /// Exposed so live-capture loops can decide when to [`Self::compact`].
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// Current buffer length (bytes total, consumed + pending).
+    pub fn buffer_len(&self) -> usize {
+        self.buf.len()
+    }
+
     /// Override the capability profile (e.g. when the firmware version is known).
     pub fn with_profile(mut self, profile: AdapterProfile) -> Self {
         self.profile = profile;
@@ -210,6 +289,20 @@ impl CsiSource for NexmonAdapter {
             status: self.status.clone(),
         }
     }
+
+    /// Streaming-capable: forwards to the inherent
+    /// [`NexmonAdapter::push_bytes`]. Lets `CaptureRuntime` push
+    /// records to a long-lived adapter without knowing the concrete
+    /// source type.
+    fn push_bytes(&mut self, more: &[u8]) -> Result<usize, RvcsiError> {
+        Ok(NexmonAdapter::push_bytes(self, more))
+    }
+
+    /// Streaming-capable: forwards to the inherent
+    /// [`NexmonAdapter::compact`].
+    fn compact_buffer(&mut self) -> usize {
+        NexmonAdapter::compact(self)
+    }
 }
 
 /// A [`CsiSource`] that reads the *real* nexmon_csi UDP payloads out of a
@@ -259,7 +352,11 @@ impl NexmonPcapAdapter {
         pcap_bytes: &[u8],
         port: Option<u16>,
     ) -> Result<Self, RvcsiError> {
-        debug_assert_eq!(shim_abi_version() >> 16, 1, "rvcsi_nexmon_shim major ABI mismatch");
+        debug_assert_eq!(
+            shim_abi_version() >> 16,
+            1,
+            "rvcsi_nexmon_shim major ABI mismatch"
+        );
         let source_id = source_id.into();
         let reader = PcapReader::parse(pcap_bytes)?;
         let link_type = reader.link_type();
@@ -293,7 +390,10 @@ impl NexmonPcapAdapter {
         }
         // Count non-CSI UDP packets on other ports as "skipped" too, for health.
         if let Some(p) = want_port {
-            skipped += reader.udp_payloads(None).filter(|(_, dp, _)| *dp != p).count() as u64;
+            skipped += reader
+                .udp_payloads(None)
+                .filter(|(_, dp, _)| *dp != p)
+                .count() as u64;
         }
         let detected_chip = detect_chip(&headers);
         Ok(NexmonPcapAdapter {
@@ -468,7 +568,12 @@ mod tests {
 
         // 56 is not in the default Nexmon profile (64/128/256) → rejected.
         let mut f = frames[0].clone();
-        let err = validate_frame(&mut f, adapter.profile(), &ValidationPolicy::default(), None);
+        let err = validate_frame(
+            &mut f,
+            adapter.profile(),
+            &ValidationPolicy::default(),
+            None,
+        );
         assert!(err.is_err());
 
         // With a permissive profile it validates fine.
@@ -488,7 +593,10 @@ mod tests {
         let bytes = make_record(1, 6, 64, Some(-60));
         let truncated = &bytes[..bytes.len() - 10];
         let err = decode_record(truncated).unwrap_err();
-        assert!(err.to_string().to_lowercase().contains("trunc") || err.to_string().to_lowercase().contains("short"));
+        assert!(
+            err.to_string().to_lowercase().contains("trunc")
+                || err.to_string().to_lowercase().contains("short")
+        );
 
         let mut adapter = NexmonAdapter::from_bytes("t", SessionId(0), truncated.to_vec());
         assert!(adapter.next_frame().is_err());
@@ -578,14 +686,23 @@ mod tests {
         let chanspec = 0xc000u16 | 0x2000 | 36; // 5 GHz, ch 36, 80 MHz
         let nsub = 256u16;
         let recs = vec![
-            (1_000u32, 100_000u32, eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1))),
+            (
+                1_000u32,
+                100_000u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1)),
+            ),
             (1_000u32, 600_000u32, eth_ip_udp(9999, &[0xaa; 8])), // unrelated UDP
-            (1_001u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-61, chanspec, nsub, 2))),
+            (
+                1_001u32,
+                0u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-61, chanspec, nsub, 2)),
+            ),
             (1_001u32, 50_000u32, eth_ip_udp(5500, &[0x42; 30])), // bad nexmon magic -> skipped
         ];
         let pcap = pcap_le_us(LINKTYPE_ETHERNET, &recs);
 
-        let mut adapter = NexmonPcapAdapter::parse("nexmon-pcap", SessionId(9), &pcap, None).unwrap();
+        let mut adapter =
+            NexmonPcapAdapter::parse("nexmon-pcap", SessionId(9), &pcap, None).unwrap();
         assert_eq!(adapter.link_type(), LINKTYPE_ETHERNET);
         assert_eq!(adapter.frame_count(), 2);
         assert_eq!(adapter.headers().len(), 2);
@@ -606,7 +723,10 @@ mod tests {
         assert_eq!(frames[0].rssi_dbm, Some(-58));
         assert_eq!(frames[0].subcarrier_count, nsub);
         // pcap timestamp -> frame timestamp (1000 s + 100000 us)
-        assert_eq!(frames[0].timestamp_ns, 1_000 * 1_000_000_000 + 100_000 * 1_000);
+        assert_eq!(
+            frames[0].timestamp_ns,
+            1_000 * 1_000_000_000 + 100_000 * 1_000
+        );
         assert_eq!(frames[1].timestamp_ns, 1_001 * 1_000_000_000);
 
         let h = adapter.health();
@@ -619,9 +739,15 @@ mod tests {
     fn pcap_adapter_validates_decoded_frames() {
         let pcap = pcap_le_us(
             LINKTYPE_ETHERNET,
-            &[(1u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-60, 0x1000 | 6, 64, 7)))],
+            &[(
+                1u32,
+                0u32,
+                eth_ip_udp(5500, &synth_nexmon_payload(-60, 0x1000 | 6, 64, 7)),
+            )],
         );
-        let frames = NexmonPcapAdapter::frames_from_pcap_bytes("p", SessionId(0), &pcap, Some(5500)).unwrap();
+        let frames =
+            NexmonPcapAdapter::frames_from_pcap_bytes("p", SessionId(0), &pcap, Some(5500))
+                .unwrap();
         assert_eq!(frames.len(), 1);
         // 64 sc, channel 6 — accepted by a permissive (offline) profile
         let mut f = frames[0].clone();
@@ -652,8 +778,16 @@ mod tests {
         let pcap = pcap_le_us(
             LINKTYPE_ETHERNET,
             &[
-                (1u32, 0u32, eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1))),
-                (1u32, 50_000u32, eth_ip_udp(5500, &synth_nexmon_payload(-59, chanspec, nsub, 2))),
+                (
+                    1u32,
+                    0u32,
+                    eth_ip_udp(5500, &synth_nexmon_payload(-58, chanspec, nsub, 1)),
+                ),
+                (
+                    1u32,
+                    50_000u32,
+                    eth_ip_udp(5500, &synth_nexmon_payload(-59, chanspec, nsub, 2)),
+                ),
             ],
         );
         let adapter = NexmonPcapAdapter::parse("pi5-cap", SessionId(1), &pcap, None).unwrap();
@@ -666,12 +800,73 @@ mod tests {
         assert!(p.accepts_channel(36));
         // 256-sc, ch 36 frame validates fine against the Pi 5 profile
         let mut f = adapter.frames[0].clone();
-        validate_frame(&mut f, &raspberry_pi_profile(RaspberryPiModel::Pi5), &ValidationPolicy::default(), None).unwrap();
+        validate_frame(
+            &mut f,
+            &raspberry_pi_profile(RaspberryPiModel::Pi5),
+            &ValidationPolicy::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(f.validation, ValidationStatus::Accepted);
 
         // explicit override to a Pi 5 also works
-        let a2 = NexmonPcapAdapter::parse("p", SessionId(0), &pcap, None).unwrap().with_pi_model(RaspberryPiModel::Pi5);
+        let a2 = NexmonPcapAdapter::parse("p", SessionId(0), &pcap, None)
+            .unwrap()
+            .with_pi_model(RaspberryPiModel::Pi5);
         assert_eq!(a2.detected_chip(), NexmonChip::Bcm43455c0);
         assert!(a2.profile().chip.as_deref().unwrap().contains("pi5"));
+    }
+
+    #[test]
+    fn live_capture_push_bytes_and_compact() {
+        // Simulates a live UDP recv loop: start with new_empty(), push
+        // records one at a time, drain with next_frame between pushes,
+        // compact periodically to bound memory.
+        let mut a = NexmonAdapter::new_empty("live", SessionId(99));
+        assert_eq!(a.buffer_len(), 0);
+        assert_eq!(a.cursor(), 0);
+
+        // Pre-push: stream is empty, next_frame yields None without error.
+        assert!(a.next_frame().unwrap().is_none());
+
+        // Push one record, expect exactly one frame.
+        let r1 = make_record(1_000, 36, 64, Some(-50));
+        let len_after_push = a.push_bytes(&r1);
+        assert_eq!(len_after_push, r1.len());
+        let f1 = a.next_frame().unwrap().expect("frame 1");
+        assert_eq!(f1.frame_id, rvcsi_core::FrameId(0));
+
+        // Cursor advanced past the first record; second next_frame returns None
+        // (no more bytes yet) — this is the live-capture "waiting for more" state.
+        assert!(a.cursor() > 0);
+        assert!(a.next_frame().unwrap().is_none());
+
+        // Push two more records in one chunk. Both should drain.
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&make_record(2_000, 36, 64, Some(-51)));
+        chunk.extend_from_slice(&make_record(3_000, 36, 64, Some(-52)));
+        a.push_bytes(&chunk);
+        let f2 = a.next_frame().unwrap().expect("frame 2");
+        let f3 = a.next_frame().unwrap().expect("frame 3");
+        assert_eq!(f2.frame_id, rvcsi_core::FrameId(1));
+        assert_eq!(f3.frame_id, rvcsi_core::FrameId(2));
+        assert!(a.next_frame().unwrap().is_none());
+
+        // compact: cursor was non-zero, expect freed > 0 and cursor reset.
+        let pre_len = a.buffer_len();
+        let freed = a.compact();
+        assert!(freed > 0);
+        assert_eq!(a.cursor(), 0);
+        assert!(a.buffer_len() < pre_len);
+
+        // Adapter remains usable after compact — push and drain still work.
+        let r4 = make_record(4_000, 36, 64, Some(-53));
+        a.push_bytes(&r4);
+        let f4 = a.next_frame().unwrap().expect("frame 4 after compact");
+        assert_eq!(
+            f4.frame_id,
+            rvcsi_core::FrameId(3),
+            "frame_id monotonicity survives compact"
+        );
     }
 }

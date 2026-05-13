@@ -218,7 +218,10 @@ mod tests {
         rec.finish().unwrap();
 
         let mut original = String::new();
-        File::open(tmp.path()).unwrap().read_to_string(&mut original).unwrap();
+        File::open(tmp.path())
+            .unwrap()
+            .read_to_string(&mut original)
+            .unwrap();
 
         // Round-trip the whole capture and re-emit it; bytes must match.
         let (h, fs) = read_all(tmp.path()).unwrap();
@@ -229,7 +232,10 @@ mod tests {
         }
         rec2.finish().unwrap();
         let mut reemitted = String::new();
-        File::open(tmp2.path()).unwrap().read_to_string(&mut reemitted).unwrap();
+        File::open(tmp2.path())
+            .unwrap()
+            .read_to_string(&mut reemitted)
+            .unwrap();
 
         assert_eq!(original, reemitted);
     }
@@ -254,7 +260,10 @@ mod tests {
     fn header_only_capture_has_no_frames() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         let header = header();
-        FileRecorder::create(tmp.path(), &header).unwrap().finish().unwrap();
+        FileRecorder::create(tmp.path(), &header)
+            .unwrap()
+            .finish()
+            .unwrap();
 
         let mut adapter = FileReplayAdapter::open(tmp.path()).unwrap();
         assert!(adapter.next_frame().unwrap().is_none());

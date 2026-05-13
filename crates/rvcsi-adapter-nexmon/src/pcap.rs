@@ -64,7 +64,10 @@ impl PcapReader {
     /// Parse a classic-pcap byte buffer.
     pub fn parse(bytes: &[u8]) -> Result<PcapReader, RvcsiError> {
         if bytes.len() < 24 {
-            return Err(parse_err(0, "buffer shorter than the 24-byte global header"));
+            return Err(parse_err(
+                0,
+                "buffer shorter than the 24-byte global header",
+            ));
         }
         // The 4 magic bytes on disk identify both byte order and ts resolution.
         // 0xa1b2c3d4 written by a LE host -> [d4,c3,b2,a1]; by a BE host -> [a1,b2,c3,d4].
@@ -101,7 +104,11 @@ impl PcapReader {
             }
             let timestamp_ns = ts_sec
                 .saturating_mul(1_000_000_000)
-                .saturating_add(if ts_is_ns { ts_frac } else { ts_frac.saturating_mul(1_000) });
+                .saturating_add(if ts_is_ns {
+                    ts_frac
+                } else {
+                    ts_frac.saturating_mul(1_000)
+                });
             packets.push(PcapPacket {
                 timestamp_ns,
                 data: bytes[data_start..data_start + incl_len].to_vec(),
@@ -124,10 +131,7 @@ impl PcapReader {
     /// Iterate the UDP payloads in the capture whose destination port matches
     /// `port` (or all UDP payloads if `port` is `None`), as `(timestamp_ns,
     /// dst_port, payload)`. Non-IPv4 / non-UDP / non-matching packets are skipped.
-    pub fn udp_payloads(
-        &self,
-        port: Option<u16>,
-    ) -> impl Iterator<Item = (u64, u16, &[u8])> + '_ {
+    pub fn udp_payloads(&self, port: Option<u16>) -> impl Iterator<Item = (u64, u16, &[u8])> + '_ {
         let link_type = self.link_type;
         self.packets.iter().filter_map(move |pkt| {
             let (dst_port, payload) = extract_udp_payload(&pkt.data, link_type)?;
@@ -332,7 +336,10 @@ mod tests {
 
     #[test]
     fn nanosecond_magic_scales_timestamps_correctly() {
-        let mut file = pcap_le_us(LINKTYPE_ETHERNET, &[(7u32, 123u32, eth_ip_udp(5500, &[0u8; 8]))]);
+        let mut file = pcap_le_us(
+            LINKTYPE_ETHERNET,
+            &[(7u32, 123u32, eth_ip_udp(5500, &[0u8; 8]))],
+        );
         // patch the magic to the nanosecond variant
         file[0..4].copy_from_slice(&PCAP_MAGIC_NS.to_le_bytes());
         let r = PcapReader::parse(&file).unwrap();
@@ -344,7 +351,7 @@ mod tests {
     fn rejects_garbage_and_pcapng() {
         assert!(PcapReader::parse(&[0u8; 10]).is_err()); // too short
         assert!(PcapReader::parse(&[0u8; 24]).is_err()); // zero magic
-        // pcapng section-header-block magic (0x0a0d0d0a) — not supported
+                                                         // pcapng section-header-block magic (0x0a0d0d0a) — not supported
         let mut ng = vec![0x0a, 0x0d, 0x0d, 0x0a];
         ng.extend_from_slice(&[0u8; 24]);
         assert!(PcapReader::parse(&ng).is_err());
@@ -352,7 +359,10 @@ mod tests {
 
     #[test]
     fn truncated_final_record_is_tolerated() {
-        let mut file = pcap_le_us(LINKTYPE_ETHERNET, &[(1u32, 0u32, eth_ip_udp(5500, &[0u8; 16]))]);
+        let mut file = pcap_le_us(
+            LINKTYPE_ETHERNET,
+            &[(1u32, 0u32, eth_ip_udp(5500, &[0u8; 16]))],
+        );
         // append a partial record header + claim a huge incl_len
         file.extend_from_slice(&2u32.to_le_bytes());
         file.extend_from_slice(&0u32.to_le_bytes());

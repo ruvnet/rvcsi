@@ -49,7 +49,10 @@ impl FileReplayAdapter {
         let mut first = String::new();
         let n = reader.read_line(&mut first)?;
         if n == 0 {
-            return Err(RvcsiError::parse(0, "empty capture file: missing header line"));
+            return Err(RvcsiError::parse(
+                0,
+                "empty capture file: missing header line",
+            ));
         }
         let header: CaptureHeader = serde_json::from_str(first.trim_end_matches(['\n', '\r']))
             .map_err(|e| RvcsiError::parse(0, format!("invalid .rvcsi header line: {e}")))?;

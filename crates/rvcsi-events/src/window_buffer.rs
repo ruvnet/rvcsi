@@ -78,7 +78,11 @@ impl WindowBuffer {
     ///
     /// # Panics
     /// Panics if `cfg.max_frames < 2`.
-    pub fn with_config(session_id: SessionId, source_id: SourceId, cfg: WindowBufferConfig) -> Self {
+    pub fn with_config(
+        session_id: SessionId,
+        source_id: SourceId,
+        cfg: WindowBufferConfig,
+    ) -> Self {
         assert!(cfg.max_frames >= 2, "WindowBuffer max_frames must be >= 2");
         WindowBuffer {
             session_id,
@@ -217,7 +221,11 @@ impl WindowBuffer {
         let raw_end = *self.timestamps.last().unwrap();
         // Edge case: a single-frame window would have start_ns == end_ns, which
         // CsiWindow::validate() rejects. Bump the end by 1 ns so it stays valid.
-        let end_ns = if raw_end > start_ns { raw_end } else { start_ns + 1 };
+        let end_ns = if raw_end > start_ns {
+            raw_end
+        } else {
+            start_ns + 1
+        };
 
         let window = CsiWindow {
             window_id: ids.next_window(),
@@ -290,7 +298,9 @@ mod tests {
         assert!(buf.push(&frame(0, "s", 1, 10, &amp, 0.9), &g).is_none());
         assert!(buf.push(&frame(0, "s", 2, 20, &amp, 0.9), &g).is_none());
         assert_eq!(buf.pending_frame_count(), 3);
-        let w = buf.push(&frame(0, "s", 3, 30, &amp, 0.9), &g).expect("window");
+        let w = buf
+            .push(&frame(0, "s", 3, 30, &amp, 0.9), &g)
+            .expect("window");
         assert_eq!(w.frame_count, 4);
         assert_eq!(buf.pending_frame_count(), 0);
         assert!(w.validate().is_ok());
@@ -318,7 +328,9 @@ mod tests {
         let mut buf = WindowBuffer::new(SessionId(0), SourceId::from("s"), 10, u64::MAX);
         let amp = [1.0f32, 1.0];
         assert!(buf.push(&frame(0, "s", 0, 100, &amp, 0.7), &g).is_none());
-        let w = buf.flush(&g).expect("flush returns the single buffered frame");
+        let w = buf
+            .flush(&g)
+            .expect("flush returns the single buffered frame");
         assert_eq!(w.frame_count, 1);
         assert_eq!(w.start_ns, 100);
         assert_eq!(w.end_ns, 101); // bumped so validate() passes
@@ -350,7 +362,9 @@ mod tests {
         assert!(buf.push(&bad, &g).is_none());
         assert_eq!(buf.pending_frame_count(), 0);
         // First good frame fixes subcarrier count = 2.
-        assert!(buf.push(&frame(0, "s", 1, 10, &[1.0, 1.0], 0.9), &g).is_none());
+        assert!(buf
+            .push(&frame(0, "s", 1, 10, &[1.0, 1.0], 0.9), &g)
+            .is_none());
         // Different subcarrier count is dropped.
         assert!(buf
             .push(&frame(0, "s", 2, 20, &[1.0, 1.0, 1.0], 0.9), &g)
@@ -369,7 +383,11 @@ mod tests {
         }
         let w = last.expect("window");
         assert_eq!(w.motion_energy, 0.0);
-        assert!(w.presence_score < 0.5, "presence_score = {}", w.presence_score);
+        assert!(
+            w.presence_score < 0.5,
+            "presence_score = {}",
+            w.presence_score
+        );
         assert!(w.validate().is_ok());
     }
 
@@ -386,7 +404,11 @@ mod tests {
         }
         let w = last.expect("window");
         assert!(w.motion_energy > 0.1, "motion_energy = {}", w.motion_energy);
-        assert!(w.presence_score > 0.5, "presence_score = {}", w.presence_score);
+        assert!(
+            w.presence_score > 0.5,
+            "presence_score = {}",
+            w.presence_score
+        );
         assert!(w.validate().is_ok());
     }
 }

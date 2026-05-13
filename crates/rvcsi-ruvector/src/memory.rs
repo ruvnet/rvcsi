@@ -268,7 +268,10 @@ mod tests {
 
         // very different
         let far_emb = window_embedding(&window(9, 1_000.0));
-        let r2 = mem.compute_drift("room1", &far_emb, 0.001).unwrap().unwrap();
+        let r2 = mem
+            .compute_drift("room1", &far_emb, 0.001)
+            .unwrap()
+            .unwrap();
         assert!(r2.exceeded, "distance was {}", r2.distance);
 
         // unknown room
@@ -301,13 +304,19 @@ mod tests {
         let b = build();
         assert_eq!(a.len(), b.len());
         let q = window_embedding(&window(2, 9.0));
-        assert_eq!(a.query_similar(&q, 5).unwrap(), b.query_similar(&q, 5).unwrap());
+        assert_eq!(
+            a.query_similar(&q, 5).unwrap(),
+            b.query_similar(&q, 5).unwrap()
+        );
     }
 
     #[test]
     fn k_zero_returns_empty() {
         let mut m = InMemoryRfMemory::new();
         m.store_window(&window(0, 1.0)).unwrap();
-        assert!(m.query_similar(&window_embedding(&window(0, 1.0)), 0).unwrap().is_empty());
+        assert!(m
+            .query_similar(&window_embedding(&window(0, 1.0)), 0)
+            .unwrap()
+            .is_empty());
     }
 }

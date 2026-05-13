@@ -149,24 +149,42 @@ mod tests {
     fn rejects_bad_time_order() {
         let mut w = good();
         w.end_ns = w.start_ns;
-        assert!(matches!(w.validate(), Err(WindowError::BadTimeOrder { .. })));
+        assert!(matches!(
+            w.validate(),
+            Err(WindowError::BadTimeOrder { .. })
+        ));
     }
 
     #[test]
     fn rejects_out_of_range_score() {
         let mut w = good();
         w.presence_score = 1.5;
-        assert!(matches!(w.validate(), Err(WindowError::ScoreOutOfRange { name: "presence_score", .. })));
+        assert!(matches!(
+            w.validate(),
+            Err(WindowError::ScoreOutOfRange {
+                name: "presence_score",
+                ..
+            })
+        ));
         let mut w = good();
         w.motion_energy = -0.1;
-        assert!(matches!(w.validate(), Err(WindowError::ScoreOutOfRange { name: "motion_energy", .. })));
+        assert!(matches!(
+            w.validate(),
+            Err(WindowError::ScoreOutOfRange {
+                name: "motion_energy",
+                ..
+            })
+        ));
     }
 
     #[test]
     fn rejects_stat_mismatch_and_empty() {
         let mut w = good();
         w.phase_variance.push(0.3);
-        assert!(matches!(w.validate(), Err(WindowError::StatLengthMismatch { .. })));
+        assert!(matches!(
+            w.validate(),
+            Err(WindowError::StatLengthMismatch { .. })
+        ));
         let mut w = good();
         w.frame_count = 0;
         assert!(matches!(w.validate(), Err(WindowError::Empty)));

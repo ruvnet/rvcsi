@@ -25,7 +25,10 @@ pub struct EventPipeline {
 impl core::fmt::Debug for EventPipeline {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EventPipeline")
-            .field("detectors", &self.detectors.iter().map(|d| d.name()).collect::<Vec<_>>())
+            .field(
+                "detectors",
+                &self.detectors.iter().map(|d| d.name()).collect::<Vec<_>>(),
+            )
             .field("pending_frame_count", &self.buffer.pending_frame_count())
             .field("recent_windows", &self.recent.len())
             .finish()
@@ -125,7 +128,10 @@ mod tests {
             Lcg(seed)
         }
         fn next_unit(&mut self) -> f32 {
-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             // top 24 bits -> [0,1)
             ((self.0 >> 40) as f32) / (1u64 << 24) as f32
         }
@@ -199,17 +205,41 @@ mod tests {
             assert!(e.validate().is_ok(), "invalid event: {e:?}");
         }
         let kinds: Vec<CsiEventKind> = events.iter().map(|e| e.kind).collect();
-        assert!(kinds.contains(&CsiEventKind::MotionDetected), "kinds = {kinds:?}");
-        assert!(kinds.contains(&CsiEventKind::PresenceStarted), "kinds = {kinds:?}");
-        assert!(kinds.contains(&CsiEventKind::MotionSettled), "kinds = {kinds:?}");
-        assert!(kinds.contains(&CsiEventKind::PresenceEnded), "kinds = {kinds:?}");
+        assert!(
+            kinds.contains(&CsiEventKind::MotionDetected),
+            "kinds = {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&CsiEventKind::PresenceStarted),
+            "kinds = {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&CsiEventKind::MotionSettled),
+            "kinds = {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&CsiEventKind::PresenceEnded),
+            "kinds = {kinds:?}"
+        );
 
         // MotionDetected should come before MotionSettled.
-        let det = events.iter().position(|e| e.kind == CsiEventKind::MotionDetected).unwrap();
-        let set = events.iter().position(|e| e.kind == CsiEventKind::MotionSettled).unwrap();
+        let det = events
+            .iter()
+            .position(|e| e.kind == CsiEventKind::MotionDetected)
+            .unwrap();
+        let set = events
+            .iter()
+            .position(|e| e.kind == CsiEventKind::MotionSettled)
+            .unwrap();
         assert!(det < set);
-        let start = events.iter().position(|e| e.kind == CsiEventKind::PresenceStarted).unwrap();
-        let end = events.iter().position(|e| e.kind == CsiEventKind::PresenceEnded).unwrap();
+        let start = events
+            .iter()
+            .position(|e| e.kind == CsiEventKind::PresenceStarted)
+            .unwrap();
+        let end = events
+            .iter()
+            .position(|e| e.kind == CsiEventKind::PresenceEnded)
+            .unwrap();
         assert!(start < end);
     }
 

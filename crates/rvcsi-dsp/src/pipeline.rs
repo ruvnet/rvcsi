@@ -107,8 +107,11 @@ impl SignalPipeline {
 
         // 1. Hampel outlier rejection on amplitude.
         if self.hampel_half_window > 0 {
-            frame.amplitude =
-                hampel_filter(&frame.amplitude, self.hampel_half_window, self.hampel_n_sigmas);
+            frame.amplitude = hampel_filter(
+                &frame.amplitude,
+                self.hampel_half_window,
+                self.hampel_n_sigmas,
+            );
         }
 
         // 2. Moving-average smoothing on amplitude.
@@ -278,7 +281,10 @@ mod tests {
         pipe.process_frame(&mut f);
         assert_eq!(f.amplitude.len(), 4);
         for v in &f.amplitude {
-            assert!(v.abs() < 10.0, "baseline-subtracted residual too large: {v}");
+            assert!(
+                v.abs() < 10.0,
+                "baseline-subtracted residual too large: {v}"
+            );
         }
         // With DC removal turned off, a frame equal to the baseline goes to
         // exactly zero.

@@ -148,7 +148,10 @@ fn validate_frames_against(raw: Vec<CsiFrame>, profile: &AdapterProfile) -> Vec<
 /// Validate against a permissive (offline-Nexmon) profile — accepts any
 /// subcarrier count / channel. Used when no specific chip was requested.
 fn validate_frames_permissive(raw: Vec<CsiFrame>) -> Vec<CsiFrame> {
-    validate_frames_against(raw, &AdapterProfile::offline(rvcsi_core::AdapterKind::Nexmon))
+    validate_frames_against(
+        raw,
+        &AdapterProfile::offline(rvcsi_core::AdapterKind::Nexmon),
+    )
 }
 
 /// Resolve a chip / Raspberry-Pi-model spec (`"pi5"`, `"bcm43455c0"`,
@@ -170,7 +173,8 @@ pub fn decode_nexmon_records(
     source_id: &str,
     session_id: u64,
 ) -> Result<Vec<CsiFrame>, RvcsiError> {
-    let raw = NexmonAdapter::frames_from_bytes(SourceId::from(source_id), SessionId(session_id), bytes)?;
+    let raw =
+        NexmonAdapter::frames_from_bytes(SourceId::from(source_id), SessionId(session_id), bytes)?;
     Ok(validate_frames_permissive(raw))
 }
 
@@ -207,8 +211,9 @@ pub fn decode_nexmon_pcap_for(
     match chip_spec {
         None => Ok(validate_frames_permissive(raw)),
         Some(spec) => {
-            let profile = nexmon_profile_for(spec)
-                .ok_or_else(|| RvcsiError::Config(format!("unknown nexmon chip / Raspberry Pi model `{spec}`")))?;
+            let profile = nexmon_profile_for(spec).ok_or_else(|| {
+                RvcsiError::Config(format!("unknown nexmon chip / Raspberry Pi model `{spec}`"))
+            })?;
             Ok(validate_frames_against(raw, &profile))
         }
     }
@@ -245,7 +250,10 @@ pub struct NexmonPcapSummary {
 }
 
 /// Summarize a nexmon_csi `.pcap` file (link type, frame counts, channels, etc.).
-pub fn summarize_nexmon_pcap(path: &str, port: Option<u16>) -> Result<NexmonPcapSummary, RvcsiError> {
+pub fn summarize_nexmon_pcap(
+    path: &str,
+    port: Option<u16>,
+) -> Result<NexmonPcapSummary, RvcsiError> {
     let bytes = std::fs::read(path)?;
     let adapter = rvcsi_adapter_nexmon::NexmonPcapAdapter::parse(
         SourceId::from(format!("pcap:{path}")),
@@ -334,7 +342,10 @@ pub fn events_from_capture(path: &str) -> Result<Vec<CsiEvent>, RvcsiError> {
 /// Replay a `.rvcsi` capture, window it, and store every window's embedding into
 /// a JSONL RF-memory file (the `rvcsi export ruvector` payload). Returns the
 /// number of windows stored.
-pub fn export_capture_to_rf_memory(capture_path: &str, out_jsonl_path: &str) -> Result<usize, RvcsiError> {
+pub fn export_capture_to_rf_memory(
+    capture_path: &str,
+    out_jsonl_path: &str,
+) -> Result<usize, RvcsiError> {
     let (header, frames) = read_all(capture_path)?;
     let mut pipeline = EventPipeline::with_defaults(header.session_id, header.source_id.clone());
     let dsp = SignalPipeline::default();
@@ -397,8 +408,12 @@ mod tests {
         for k in 0..n {
             // alternate "quiet" and "active" amplitudes so the event pipeline has something to do
             let amp_scale = if (k / 8) % 2 == 0 { 0.0 } else { 1.5 };
-            let i: Vec<f32> = (0..32).map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0)).collect();
-            let q: Vec<f32> = (0..32).map(|s| 0.5 + amp_scale * (((k * 3 + s) % 7) as f32 - 3.0) * 0.1).collect();
+            let i: Vec<f32> = (0..32)
+                .map(|s| 1.0 + amp_scale * (((k + s) % 5) as f32 - 2.0))
+                .collect();
+            let q: Vec<f32> = (0..32)
+                .map(|s| 0.5 + amp_scale * (((k * 3 + s) % 7) as f32 - 3.0) * 0.1)
+                .collect();
             let mut f = CsiFrame::from_iq(
                 FrameId(k as u64),
                 SessionId(1),
@@ -437,8 +452,15 @@ mod tests {
     #[test]
     fn summarize_empty_capture() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        let header = CaptureHeader::new(SessionId(9), SourceId::from("e"), AdapterProfile::offline(AdapterKind::File));
-        FileRecorder::create(tmp.path(), &header).unwrap().finish().unwrap();
+        let header = CaptureHeader::new(
+            SessionId(9),
+            SourceId::from("e"),
+            AdapterProfile::offline(AdapterKind::File),
+        );
+        FileRecorder::create(tmp.path(), &header)
+            .unwrap()
+            .finish()
+            .unwrap();
         let s = summarize_capture(tmp.path().to_str().unwrap()).unwrap();
         assert_eq!(s.frame_count, 0);
         assert_eq!(s.mean_quality, 0.0);
@@ -480,7 +502,10 @@ mod tests {
         let events = events_from_capture(tmp.path().to_str().unwrap()).unwrap();
         // the alternating quiet/active stream should produce at least one event,
         // and every event must be well-formed.
-        assert!(!events.is_empty(), "expected the event pipeline to emit something");
+        assert!(
+            !events.is_empty(),
+            "expected the event pipeline to emit something"
+        );
         for e in &events {
             e.validate().unwrap();
             assert!((0.0..=1.0).contains(&e.confidence));
@@ -488,11 +513,9 @@ mod tests {
         }
 
         let out = tempfile::NamedTempFile::new().unwrap();
-        let stored = export_capture_to_rf_memory(
-            tmp.path().to_str().unwrap(),
-            out.path().to_str().unwrap(),
-        )
-        .unwrap();
+        let stored =
+            export_capture_to_rf_memory(tmp.path().to_str().unwrap(), out.path().to_str().unwrap())
+                .unwrap();
         assert!(stored > 0);
         // re-open the JSONL store and confirm the records round-tripped
         let reopened = JsonlRfMemory::open(out.path().to_str().unwrap()).unwrap();
@@ -500,7 +523,10 @@ mod tests {
 
         let (wc, score) = rf_memory_self_check(tmp.path().to_str().unwrap()).unwrap();
         assert!(wc > 0);
-        assert!((score - 1.0).abs() < 1e-4, "self-similarity should be ~1.0, got {score}");
+        assert!(
+            (score - 1.0).abs() < 1e-4,
+            "self-similarity should be ~1.0, got {score}"
+        );
     }
 
     #[test]
@@ -533,9 +559,18 @@ mod tests {
         let nsub = 256u16;
         let frames: Vec<(u64, NexmonCsiHeader, Vec<f32>, Vec<f32>)> = (0..4u64)
             .map(|k| {
-                let i: Vec<f32> = (0..nsub).map(|s| (s as i16 - 128 + k as i16) as f32).collect();
-                let q: Vec<f32> = (0..nsub).map(|s| (s as i16 % 7 + k as i16) as f32).collect();
-                (1_000_000_000 + k * 50_000_000, synth_nexmon_header(-58 - k as i16, chanspec, nsub, k as u16 + 1), i, q)
+                let i: Vec<f32> = (0..nsub)
+                    .map(|s| (s as i16 - 128 + k as i16) as f32)
+                    .collect();
+                let q: Vec<f32> = (0..nsub)
+                    .map(|s| (s as i16 % 7 + k as i16) as f32)
+                    .collect();
+                (
+                    1_000_000_000 + k * 50_000_000,
+                    synth_nexmon_header(-58 - k as i16, chanspec, nsub, k as u16 + 1),
+                    i,
+                    q,
+                )
             })
             .collect();
         rvcsi_adapter_nexmon::synthetic_nexmon_pcap(&frames, 5500).expect("build pcap")
@@ -556,14 +591,35 @@ mod tests {
         assert_eq!(frames[0].timestamp_ns, 1_000_000_000);
         assert_eq!(frames[3].timestamp_ns, 1_000_000_000 + 3 * 50_000_000);
         // explicit-port form works too
-        assert_eq!(decode_nexmon_pcap(&pcap, "s", 0, Some(5500)).unwrap().len(), 4);
-        assert_eq!(decode_nexmon_pcap(&pcap, "s", 0, Some(9999)).unwrap().len(), 0);
+        assert_eq!(
+            decode_nexmon_pcap(&pcap, "s", 0, Some(5500)).unwrap().len(),
+            4
+        );
+        assert_eq!(
+            decode_nexmon_pcap(&pcap, "s", 0, Some(9999)).unwrap().len(),
+            0
+        );
 
         // --chip pi5 / bcm43455c0: the 256-sc VHT80 ch36 frames all conform
-        assert_eq!(decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("pi5")).unwrap().len(), 4);
-        assert_eq!(decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("bcm43455c0")).unwrap().len(), 4);
+        assert_eq!(
+            decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("pi5"))
+                .unwrap()
+                .len(),
+            4
+        );
+        assert_eq!(
+            decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("bcm43455c0"))
+                .unwrap()
+                .len(),
+            4
+        );
         // --chip pizero2w (bcm43436b0): 2.4 GHz only, max 128 sc -> all dropped
-        assert_eq!(decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("pizero2w")).unwrap().len(), 0);
+        assert_eq!(
+            decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("pizero2w"))
+                .unwrap()
+                .len(),
+            0
+        );
         // unknown spec -> Config error
         assert!(decode_nexmon_pcap_for(&pcap, "s", 0, None, Some("not-a-chip")).is_err());
         // nexmon_profile_for resolves both chip slugs and Pi model slugs

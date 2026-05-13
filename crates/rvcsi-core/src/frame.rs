@@ -202,7 +202,10 @@ mod tests {
 
     #[test]
     fn builder_setters_and_mean() {
-        let f = sample().with_rssi(-55).with_noise_floor(-92).with_chains(Some(0), None, Some(1));
+        let f = sample()
+            .with_rssi(-55)
+            .with_noise_floor(-92)
+            .with_chains(Some(0), None, Some(1));
         assert_eq!(f.rssi_dbm, Some(-55));
         assert_eq!(f.noise_floor_dbm, Some(-92));
         assert_eq!(f.antenna_index, Some(0));

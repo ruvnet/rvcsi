@@ -102,7 +102,10 @@ mod tests {
         rec.finish().unwrap();
 
         let mut contents = String::new();
-        File::open(tmp.path()).unwrap().read_to_string(&mut contents).unwrap();
+        File::open(tmp.path())
+            .unwrap()
+            .read_to_string(&mut contents)
+            .unwrap();
         let lines: Vec<&str> = contents.lines().collect();
         assert_eq!(lines.len(), 3);
         let parsed_header: CaptureHeader = serde_json::from_str(lines[0]).unwrap();
