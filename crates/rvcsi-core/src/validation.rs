@@ -272,7 +272,8 @@ pub fn validate_frame(
         let mut sorted: Vec<f32> = frame.amplitude.clone();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
         let median = sorted[sc / 2].max(1e-9);
-        let max = *sorted.last().unwrap();
+        // `sorted` has `sc >= 3` elements; indexing the last is always safe here.
+        let max = sorted[sc - 1];
         if max > median * 50.0 {
             q.penalize(
                 0.7,
@@ -298,12 +299,10 @@ pub fn validate_frame(
                 min: policy.min_quality,
             });
         }
-    } else if q.reasons.is_empty() {
-        ValidationStatus::Accepted
-    } else if policy.degrade_instead_of_reject {
-        // soft penalties but above the floor → still acceptable, just note them
-        ValidationStatus::Accepted
     } else {
+        // Quality is at or above the floor (possibly with soft-penalty reasons).
+        // Soft penalties above the floor are always Accepted — they are noted in
+        // `quality_reasons` but do not demote the frame further.
         ValidationStatus::Accepted
     };
 

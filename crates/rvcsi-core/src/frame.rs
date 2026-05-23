@@ -92,6 +92,12 @@ impl CsiFrame {
     /// `amplitude` and `phase` are derived from `i_values`/`q_values`. The
     /// frame is returned with `validation = Pending` and `quality_score = 0.0`;
     /// run [`crate::validate_frame`] before exposing it.
+    ///
+    /// # Precondition
+    ///
+    /// `i_values.len()` must be `<= u16::MAX` (65535). Values larger than that
+    /// truncate `subcarrier_count`, causing the validation gate to reject the
+    /// frame immediately via `LengthMismatch`. Debug builds assert this invariant.
     #[allow(clippy::too_many_arguments)]
     pub fn from_iq(
         frame_id: FrameId,
@@ -105,6 +111,10 @@ impl CsiFrame {
         q_values: Vec<f32>,
     ) -> Self {
         let n = i_values.len();
+        debug_assert!(
+            n <= u16::MAX as usize,
+            "from_iq: i_values.len() {n} exceeds u16::MAX; subcarrier_count would truncate"
+        );
         let mut amplitude = Vec::with_capacity(n);
         let mut phase = Vec::with_capacity(n);
         for (i, q) in i_values.iter().zip(q_values.iter()) {

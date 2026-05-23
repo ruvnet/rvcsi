@@ -198,14 +198,31 @@ pub fn extract_udp_payload(frame: &[u8], link_type: u32) -> Option<(u16, &[u8])>
     Some((dst_port, &udp[8..8 + payload_len]))
 }
 
+/// Maximum UDP payload length that fits in a single unfragmented IPv4 packet
+/// (65535 - 20-byte IP header - 8-byte UDP header).
+pub const MAX_UDP_PAYLOAD_BYTES: usize = 65507;
+
 /// Build a synthetic classic-pcap byte buffer — little-endian, microsecond
 /// timestamps, [`LINKTYPE_ETHERNET`] — wrapping the given UDP payloads, one
 /// Ethernet/IPv4/UDP packet each. Entries are `(timestamp_ns, dst_port,
 /// payload)`. Intended for tests, examples and the `rvcsi` self-tests: real
 /// captures come off a Raspberry Pi running patched firmware
 /// (`tcpdump -i wlan0 dst port 5500 -w csi.pcap`).
+///
+/// # Panics (debug builds only)
+///
+/// Panics if any payload exceeds [`MAX_UDP_PAYLOAD_BYTES`] (65507 bytes).
+/// A larger payload would silently truncate the IPv4/UDP length fields to
+/// wrong values.
 pub fn synthetic_udp_pcap(packets: &[(u64, u16, &[u8])]) -> Vec<u8> {
     fn eth_ip_udp(dst_port: u16, payload: &[u8]) -> Vec<u8> {
+        debug_assert!(
+            payload.len() <= MAX_UDP_PAYLOAD_BYTES,
+            "synthetic_udp_pcap: payload ({} bytes) exceeds MAX_UDP_PAYLOAD_BYTES ({}); \
+             IPv4/UDP length fields would truncate",
+            payload.len(),
+            MAX_UDP_PAYLOAD_BYTES
+        );
         let mut f = vec![
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, // dst mac
             0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, // src mac
