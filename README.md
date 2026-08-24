@@ -15,12 +15,13 @@ rvCSI is the **stable, hardware-abstracted runtime layer** that real CSI pipelin
 - **Normalizes** everything into one schema — `CsiFrame` → `CsiWindow` → `CsiEvent`.
 - **Processes** with reusable DSP — Hampel/MAD outlier filter, phase unwrap, smoothing, sliding variance, DC removal, baseline subtraction, motion energy, presence, heuristic breathing-band estimate.
 - **Emits** typed events with confidence + evidence — presence started/ended, motion detected/settled, baseline drift, anomaly, signal-quality drop, calibration-required, breathing candidate.
+- **Fuses without conflating** verified-envelope BLE advertisement association evidence, anonymous WiFi CSI tracks, and identity-free future Bluetooth Channel Sounding phase/timing procedures. Association confidence has a 0.60 floor and exact crossings abstain before rebinding. Exact respiratory components and phase/RTT are P0 and fail external export checks.
 - **Bridges** to [RuVector](https://github.com/ruvnet/ruvector) as RF memory — deterministic window/event embeddings, similarity search, drift detection.
 - **Exposes** a Rust API, a TypeScript SDK ([`@ruv/rvcsi`](https://www.npmjs.com/package/@ruv/rvcsi), napi-rs), and a CLI (`rvcsi`).
 
 > rvCSI is *structural sensing*: excellent at detecting change, presence, motion, drift, and learned patterns — deliberately silent on exact identity, exact pose, and medical-grade certainty. **Detection ≠ decision** — rvCSI emits evidence; agents and applications decide what to do.
 
-The architecture is set by **[ADR-095](docs/adr/ADR-095-rvcsi-edge-rf-sensing-platform.md)** (the 15 platform decisions: Rust core, C-only-at-the-hardware-boundary, TS SDK via napi-rs, normalized schema, validate-before-FFI, CSI-as-temporal-delta, RuVector as RF memory, replayability, detection≠decision, local-first, read-first/write-gated MCP, mandatory quality scoring, versioned calibration, plugin adapters) and **[ADR-096](docs/adr/ADR-096-rvcsi-ffi-crate-layout.md)** (the crate topology, the napi-c shim contract, the napi-rs surface). See the [PRD](docs/prd/rvcsi-platform-prd.md) for requirements and the [domain model](docs/ddd/rvcsi-domain-model.md) for the 7 bounded contexts.
+The architecture is set by **[ADR-095](docs/adr/ADR-095-rvcsi-edge-rf-sensing-platform.md)** (the 15 platform decisions: Rust core, C-only-at-the-hardware-boundary, TS SDK via napi-rs, normalized schema, validate-before-FFI, CSI-as-temporal-delta, RuVector as RF memory, replayability, detection≠decision, local-first, read-first/write-gated MCP, mandatory quality scoring, versioned calibration, plugin adapters), **[ADR-096](docs/adr/ADR-096-rvcsi-ffi-crate-layout.md)** (the crate topology, the napi-c shim contract, the napi-rs surface), and **[ADR-097](docs/adr/ADR-097-ble-csi-fusion-evidence.md)** (BLE plus CSI evidence, expiry, authentication, privacy, and deterministic simulation). See the [PRD](docs/prd/rvcsi-platform-prd.md) for requirements and the [domain model](docs/ddd/rvcsi-domain-model.md) for the 7 bounded contexts.
 
 ---
 
@@ -28,7 +29,7 @@ The architecture is set by **[ADR-095](docs/adr/ADR-095-rvcsi-edge-rf-sensing-pl
 
 | Crate | `unsafe`? | What it owns |
 |-------|-----------|--------------|
-| [`rvcsi-core`](crates/rvcsi-core) | no (`forbid`) | The normalized `CsiFrame`/`CsiWindow`/`CsiEvent` schema, `AdapterProfile`, the `CsiSource` plugin trait, id newtypes + `IdGenerator`, `RvcsiError`, the `validate_frame` pipeline + quality scoring. The shared kernel. |
+| [`rvcsi-core`](crates/rvcsi-core) | no (`forbid`) | The normalized `CsiFrame`/`CsiWindow`/`CsiEvent` schema, typed BLE plus CSI fusion evidence, stateful deterministic replay and crossing simulator, `AdapterProfile`, the `CsiSource` plugin trait, id newtypes + `IdGenerator`, `RvcsiError`, the `validate_frame` pipeline + quality scoring. The shared kernel. |
 | [`rvcsi-dsp`](crates/rvcsi-dsp) | no (`forbid`) | Pure DSP primitives (`mean`/`variance`/`median`, `remove_dc_offset`, `unwrap_phase`, `moving_average`, `ewma`, `hampel_filter`, `short_window_variance`, `subtract_baseline`), scalar features (`motion_energy`, `presence_score`, `confidence_score`, heuristic `breathing_band_estimate`), and a non-destructive `SignalPipeline::process_frame`. |
 | [`rvcsi-events`](crates/rvcsi-events) | no (`forbid`) | `WindowBuffer` (frames → `CsiWindow`), the `EventDetector` trait + presence/motion/quality/baseline-drift state machines (drift thresholds are **scale-relative** — a fraction of the baseline magnitude — so one tuning works across `int8` ESP32, `int16`-scaled Nexmon, and baseline-subtracted streams), and `EventPipeline`. |
 | [`rvcsi-adapter-file`](crates/rvcsi-adapter-file) | no (`forbid`) | The `.rvcsi` capture container (JSONL: a header line + one `CsiFrame` per line), `FileRecorder`, `FileReplayAdapter` — deterministic replay. |
@@ -36,7 +37,7 @@ The architecture is set by **[ADR-095](docs/adr/ADR-095-rvcsi-edge-rf-sensing-pl
 | [`rvcsi-ruvector`](crates/rvcsi-ruvector) | no (`forbid`) | The RuVector RF-memory bridge: deterministic `window_embedding`/`event_embedding`, `cosine_similarity`, the `RfMemoryStore` trait, `InMemoryRfMemory` + `JsonlRfMemory` (standins until the production RuVector binding lands). |
 | [`rvcsi-runtime`](crates/rvcsi-runtime) | no (`forbid`) | The no-FFI composition layer: `CaptureRuntime` = `CsiSource` + `validate_frame` + `SignalPipeline` + `EventPipeline`, plus one-shot helpers (`summarize_capture`, `decode_nexmon_records`, `decode_nexmon_pcap`, `summarize_nexmon_pcap`, `events_from_capture`, `export_capture_to_rf_memory`). The shared layer under `rvcsi-node` and `rvcsi-cli`. |
 | [`rvcsi-node`](crates/rvcsi-node) | no (`deny(clippy::all)`) | The **napi-rs** seam — the `.node` addon (cdylib + rlib) exposing a safe TS-facing surface (thin `#[napi]` wrappers over `rvcsi-runtime`); ships as the [`@ruv/rvcsi`](https://www.npmjs.com/package/@ruv/rvcsi) npm package. |
-| [`rvcsi-cli`](crates/rvcsi-cli) | no | The `rvcsi` binary: `record`, `inspect`, `inspect-nexmon`, `nexmon-chips`, `decode-chanspec`, `replay`, `stream`, `events`, `health`, `calibrate`, `export ruvector`. |
+| [`rvcsi-cli`](crates/rvcsi-cli) | no | The `rvcsi` binary: `record`, `inspect`, `inspect-nexmon`, `nexmon-chips`, `decode-chanspec`, `replay`, `stream`, `events`, `health`, `calibrate`, `simulate-fusion`, `export ruvector`. |
 
 `rvcsi-mcp` (an MCP tool server), `rvcsi-daemon` (live radio capture + WebSocket), `rvcsi-adapter-esp32` (a live ESP32 serial/UDP source), and the legacy nexmon *packed-float* CSI export are tracked as follow-ups on top of these crates.
 
@@ -101,6 +102,10 @@ rvcsi events session.rvcsi
 rvcsi calibrate --in session.rvcsi --out baseline.json
 rvcsi decode-chanspec 0xe024
 rvcsi nexmon-chips
+
+# Exercise BLE pseudonymous anchoring, CSI track crossing, spoof and expiry rejection:
+rvcsi simulate-fusion
+rvcsi simulate-fusion --json --include-p0-edge-only > edge-local-synthetic-fusion.json
 ```
 
 There is **no ESP32 adapter crate yet** — until `rvcsi-adapter-esp32` lands, an ESP32 `.csi.jsonl` recording can be transcoded into `.rvcsi` with the bridge script in [`scripts/`](scripts/), then run through the same `inspect` / `events` / `calibrate` toolchain.

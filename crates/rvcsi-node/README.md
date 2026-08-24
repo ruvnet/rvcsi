@@ -4,12 +4,19 @@ Node.js bindings (napi-rs) for **rvCSI** — the edge RF sensing runtime: ingest
 WiFi CSI from files / Nexmon dumps, validate and normalize it, run reusable DSP,
 emit typed presence / motion / quality / anomaly events, and export temporal
 embeddings to an RF-memory store. See [ADR-095](../../docs/adr/ADR-095-rvcsi-edge-rf-sensing-platform.md)
-and [ADR-096](../../docs/adr/ADR-096-rvcsi-ffi-crate-layout.md).
+and [ADR-096](../../docs/adr/ADR-096-rvcsi-ffi-crate-layout.md), plus the BLE/CSI
+privacy contract in [ADR-097](../../docs/adr/ADR-097-ble-csi-fusion-evidence.md).
 
 > This package wraps the Rust crates in `crates/rvcsi-*`. The Rust side does
 > all the work (parsing, validation, DSP, events, embeddings); this is a thin,
 > safe JS surface — nothing crosses the boundary except validated/normalized
 > objects (delivered as JSON the SDK parses for you).
+
+Event JSON from this addon is checked under the external export scope. It fails
+closed if an event contains P0 exact respiratory components or Channel Sounding
+phase/RTT; those primitives are available only to governed edge-local Rust
+consumers. Authenticated BLE evidence also requires a retained verified
+`RuView/GW/v1` receipt, and RVCS Channel Sounding carries no identity token.
 
 ## Build
 

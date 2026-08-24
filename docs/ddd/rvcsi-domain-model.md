@@ -276,6 +276,15 @@ The **`CsiFrame` schema is the shared kernel** between Capture, Validation, Sign
 1. Every event references at least one evidence window.
 2. Confidence is bounded in [0, 1].
 3. Event suppression must be explainable by policy.
+4. Typed sensing evidence is valid only before its expiry. Equality with the expiry is expired. Consumers call `validate_at(now_ns)` at publication boundaries.
+5. Typed evidence, valid application tokens, associations, and typed events have a maximum five second lifetime. An event cannot outlive any nested evidence or association, and evidence cannot claim a capture timestamp after event publication.
+6. A track association must have fresh, non-abstained, authenticated BLE advertisement evidence for the same rotating token and fresh, non-abstained WiFi CSI evidence for the same track token. Both supports must cover the association lifetime. `authenticated` requires a retained verified `RuView/GW/v1` envelope receipt; an inner flag or caller boolean is insufficient.
+7. Association confidence is at least 0.60 and cannot exceed the weaker eligible BLE or WiFi CSI support confidence. Exact crossing ambiguity removes the association; a later unambiguous sample must rebind it.
+8. A BLE pseudonym has exactly the `blep:` prefix and 64 lowercase hexadecimal digest characters. BLE evidence preserves authenticated `token_epoch` and `source_sequence` fields for replay protection.
+9. BLE advertisement RSSI and Bluetooth Channel Sounding phase or timing are distinct evidence variants and capabilities. RVCS has no pseudonymous identity join. Channel Sounding is grouped by a nonzero source session and canonical decimal nonzero u32 procedure id, has an exact declared step count, and includes at least four unique channels no greater than 78. Signed phase is normalized to `[-π, π)` and RTT picoseconds are divided by 1000 and bounded to 250 ns.
+10. Exact `respiratory_component` values and Channel Sounding phase/RTT are P0. They fail an external export check and may leave the normalized event only under the explicit governed edge-only scope.
+11. Fusion nanosecond values serialize as decimal JSON strings so JavaScript does not lose precision.
+12. An abstained event must include at least one typed quality reason.
 
 ### `RoomMemory` aggregate
 
@@ -349,6 +358,12 @@ pub struct CsiEvent {
     pub confidence: f32,
     pub evidence_window_ids: Vec<WindowId>,
     pub metadata_json: String,
+    pub disposition: EventDisposition,
+    pub quality_reasons: Vec<QualityReason>,
+    pub sensing_evidence: Vec<SensingEvidence>,
+    pub track_association: Option<TrackAssociation>,
+    pub synthetic_label: Option<SyntheticLabel>,
+    pub expires_at_ns: Option<u64>,
 }
 
 pub struct AdapterProfile {

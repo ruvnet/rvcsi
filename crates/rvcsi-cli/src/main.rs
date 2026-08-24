@@ -136,6 +136,27 @@ enum Command {
         #[arg(long = "out")]
         output: Option<String>,
     },
+    /// Generate a deterministic two-person BLE + CSI fusion fixture.
+    SimulateFusion {
+        /// Odd number of steps, at least 9, with one exact crossing midpoint.
+        #[arg(long, default_value_t = 13)]
+        steps: u16,
+        /// Simulated interval between samples in milliseconds.
+        #[arg(long, default_value_t = 250)]
+        step_ms: u64,
+        /// Add future-radio Channel Sounding phase/timing evidence. This is not
+        /// attributed to the ESP32-S3 source.
+        #[arg(long)]
+        channel_sounding: bool,
+        /// Emit the complete synthetic event contract instead of safe counters.
+        /// Requires the separate P0 edge-only assertion below.
+        #[arg(long)]
+        json: bool,
+        /// Permit P0 respiratory and exact phase/timing primitives in JSON.
+        /// The caller is asserting that stdout remains inside the governed edge.
+        #[arg(long, requires = "json")]
+        include_p0_edge_only: bool,
+    },
     /// Export data derived from a capture.
     Export {
         #[command(subcommand)]
@@ -230,6 +251,20 @@ fn main() -> anyhow::Result<()> {
         Command::Calibrate { input, output } => {
             commands::calibrate(&mut out, &input, output.as_deref())?
         }
+        Command::SimulateFusion {
+            steps,
+            step_ms,
+            channel_sounding,
+            json,
+            include_p0_edge_only,
+        } => commands::simulate_fusion(
+            &mut out,
+            json,
+            steps,
+            step_ms,
+            channel_sounding,
+            include_p0_edge_only,
+        )?,
         Command::Export { target } => match target {
             ExportTarget::Ruvector(a) => commands::export_ruvector(&mut out, &a.input, &a.output)?,
         },

@@ -18,16 +18,32 @@
 mod adapter;
 mod error;
 mod event;
+mod evidence;
 mod frame;
 mod ids;
+mod simulation;
 mod validation;
 mod window;
 
 pub use adapter::{AdapterKind, AdapterProfile, CsiSource, SourceConfig, SourceHealth};
 pub use error::RvcsiError;
-pub use event::{CsiEvent, CsiEventKind};
+pub use event::{CsiEvent, CsiEventKind, EventError, MAX_EVENT_TTL_NS};
+pub use evidence::{
+    ChannelSoundingRole, ChannelSoundingStep, EventDisposition, EvidenceError, EvidenceExportScope,
+    EvidenceQuality, GatewayEnvelopeContract, PrivacyClass, PseudonymousToken, QualityReason,
+    SensingEvidence, SensingEvidencePayload, SourceCapability, SyntheticLabel, TokenAuthentication,
+    TokenStatus, TrackAssociation, VerifiedGatewayEnvelope, MAX_ASSOCIATION_TTL_NS,
+    MAX_CHANNEL_SOUNDING_CHANNEL_INDEX, MAX_CHANNEL_SOUNDING_RTT_NS, MAX_CHANNEL_SOUNDING_STEPS,
+    MAX_EVIDENCE_TTL_NS, MAX_GATEWAY_TIMING_UNCERTAINTY_US, MAX_RVCS_PHASE_MILLIRADIANS,
+    MAX_RVCS_RTT_PICOSECONDS, MAX_TOKEN_TTL_NS, MIN_ASSOCIATION_CONFIDENCE,
+    MIN_CHANNEL_SOUNDING_STEPS,
+};
 pub use frame::{CsiFrame, ValidationStatus};
 pub use ids::{EventId, FrameId, IdGenerator, SessionId, SourceId, WindowId};
+pub use simulation::{
+    run_ble_csi_crossing_simulation, FusionSimulationConfig, FusionSimulationError,
+    FusionSimulationReport, FusionSimulationSummary,
+};
 pub use validation::{validate_frame, QualityScore, ValidationError, ValidationPolicy};
 pub use window::CsiWindow;
 

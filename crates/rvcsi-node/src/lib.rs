@@ -35,6 +35,7 @@
 extern crate napi_derive;
 
 use napi::bindgen_prelude::Buffer;
+use rvcsi_core::{CsiEvent, EvidenceExportScope};
 
 use rvcsi_runtime::{self as runtime, CaptureRuntime};
 
@@ -44,6 +45,15 @@ fn napi_err(e: impl std::fmt::Display) -> napi::Error {
 
 fn to_json<T: serde::Serialize>(v: &T) -> napi::Result<String> {
     serde_json::to_string(v).map_err(napi_err)
+}
+
+fn to_external_event_json(events: &[CsiEvent]) -> napi::Result<String> {
+    for event in events {
+        event
+            .validate_for_export_at(event.timestamp_ns, EvidenceExportScope::External)
+            .map_err(napi_err)?;
+    }
+    to_json(&events)
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +97,7 @@ pub fn inspect_capture_file(path: String) -> napi::Result<String> {
 #[napi]
 pub fn events_from_capture_file(path: String) -> napi::Result<String> {
     let events = runtime::events_from_capture(&path).map_err(napi_err)?;
-    to_json(&events)
+    to_external_event_json(&events)
 }
 
 /// Replay a `.rvcsi` capture, window it, and store each window's embedding into
@@ -268,7 +278,7 @@ impl RvcsiRuntime {
     #[napi]
     pub fn drain_events_json(&mut self) -> napi::Result<String> {
         let events = self.inner.drain_events().map_err(napi_err)?;
-        to_json(&events)
+        to_external_event_json(&events)
     }
 
     /// Health snapshot as JSON (`SourceHealth`).
