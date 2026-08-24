@@ -10,8 +10,8 @@ use anyhow::{Context, Result};
 use rvcsi_adapter_file::{read_all, CaptureHeader, FileRecorder, FileReplayAdapter};
 use rvcsi_adapter_nexmon::NexmonAdapter;
 use rvcsi_core::{
-    validate_frame, AdapterKind, AdapterProfile, CsiFrame, CsiSource, SessionId, SourceId,
-    ValidationPolicy,
+    run_ble_csi_crossing_simulation, validate_frame, AdapterKind, AdapterProfile, CsiFrame,
+    CsiSource, EvidenceExportScope, FusionSimulationConfig, SessionId, SourceId, ValidationPolicy,
 };
 use rvcsi_runtime as runtime;
 
@@ -348,6 +348,14 @@ pub fn replay(out: &mut dyn Write, path: &str, json: bool, limit: Option<usize>)
 /// and print the emitted events (compact, or full JSON with `json`).
 pub fn events(out: &mut dyn Write, path: &str, json: bool) -> Result<()> {
     let evs = runtime::events_from_capture(path).with_context(|| format!("processing {path}"))?;
+    for (index, event) in evs.iter().enumerate() {
+        let validation = if json {
+            event.validate_for_export_at(event.timestamp_ns, EvidenceExportScope::External)
+        } else {
+            event.validate_at(event.timestamp_ns)
+        };
+        validation.with_context(|| format!("event {index} failed output-boundary validation"))?;
+    }
     if json {
         writeln!(out, "{}", serde_json::to_string_pretty(&evs)?)?;
         return Ok(());
@@ -465,6 +473,85 @@ pub fn calibrate(out: &mut dyn Write, capture: &str, out_path: Option<&str>) -> 
     } else {
         writeln!(out, "{json}")?;
     }
+    Ok(())
+}
+
+/// `rvcsi simulate-fusion` — generate a deterministic BLE advertisement plus
+/// WiFi CSI crossing scenario using the normal [`rvcsi_core::CsiEvent`] schema.
+/// Human output contains counters only. JSON output is an explicitly synthetic
+/// fixture and contains no hardware address or real-world identity, but its P0
+/// micro-motion primitives require the explicit governed edge-only assertion.
+pub fn simulate_fusion(
+    out: &mut dyn Write,
+    json: bool,
+    steps: u16,
+    step_ms: u64,
+    include_channel_sounding: bool,
+    include_p0_edge_only: bool,
+) -> Result<()> {
+    let step_ns = step_ms
+        .checked_mul(1_000_000)
+        .context("--step-ms is too large")?;
+    let report = run_ble_csi_crossing_simulation(FusionSimulationConfig {
+        steps,
+        step_ns,
+        include_channel_sounding,
+    })?;
+    if json {
+        let scope = if include_p0_edge_only {
+            EvidenceExportScope::EdgeOnly
+        } else {
+            EvidenceExportScope::External
+        };
+        report
+            .validate_for_output(scope)
+            .context("synthetic fusion report failed output-boundary validation")?;
+        writeln!(out, "{}", serde_json::to_string_pretty(&report)?)?;
+        return Ok(());
+    }
+
+    let s = report.summary;
+    writeln!(out, "deterministic BLE + CSI fusion simulation")?;
+    writeln!(
+        out,
+        "  schema version           : {}",
+        report.schema_version
+    )?;
+    writeln!(out, "  steps                    : {}", report.config.steps)?;
+    writeln!(out, "  events                   : {}", s.event_count)?;
+    writeln!(
+        out,
+        "  token associations       : {}",
+        s.identity_associations
+    )?;
+    writeln!(out, "  association swaps        : {}", s.identity_swaps)?;
+    writeln!(
+        out,
+        "  crossing associations    : {}",
+        s.crossing_associations
+    )?;
+    writeln!(out, "  explicit abstentions     : {}", s.abstentions)?;
+    writeln!(out, "  motion abstentions       : {}", s.motion_abstentions)?;
+    writeln!(
+        out,
+        "  expired token rejections : {}",
+        s.expired_token_rejections
+    )?;
+    writeln!(out, "  spoof rejections         : {}", s.spoof_rejections)?;
+    writeln!(
+        out,
+        "  respiratory candidates   : {}",
+        s.respiratory_candidates
+    )?;
+    writeln!(
+        out,
+        "  channel sounding         : {}",
+        if report.config.include_channel_sounding {
+            "simulated future radio"
+        } else {
+            "excluded (ESP32-S3 profile)"
+        }
+    )?;
     Ok(())
 }
 
@@ -586,6 +673,34 @@ mod tests {
         assert!(out2.contains("wrote baseline"));
         let written = std::fs::read_to_string(baseline_file.path()).unwrap();
         assert!(written.contains("baseline_amplitude"));
+    }
+
+    #[test]
+    fn fusion_simulation_human_output_is_safe_and_json_uses_shared_events() {
+        let human = run(|o| simulate_fusion(o, false, 13, 250, false, false));
+        assert!(human.contains("association swaps        : 0"), "{human}");
+        assert!(human.contains("expired token rejections : 1"), "{human}");
+        assert!(human.contains("spoof rejections         : 1"), "{human}");
+        assert!(human.contains("ESP32-S3 profile"), "{human}");
+        assert!(!human.contains("blep:"));
+        assert!(!human.contains("sim_subject"));
+        assert!(!human.contains("respiratory_component"));
+
+        let mut denied = Vec::new();
+        let error = simulate_fusion(&mut denied, true, 13, 250, true, false).unwrap_err();
+        assert!(error.to_string().contains("output-boundary validation"));
+        assert!(denied.is_empty());
+
+        let json = run(|o| simulate_fusion(o, true, 13, 250, true, true));
+        let report: rvcsi_core::FusionSimulationReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(report.summary.identity_swaps, 0);
+        let wire: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(wire["events"][0]["timestamp_ns"].is_string());
+        assert!(wire["events"][0]["sensing_evidence"][0]["timestamp_ns"].is_string());
+        assert!(report
+            .events
+            .iter()
+            .all(|event| !event.sensing_evidence.is_empty()));
     }
 
     #[test]

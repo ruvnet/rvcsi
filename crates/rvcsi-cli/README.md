@@ -20,6 +20,7 @@ cargo install rvcsi-cli      # installs the `rvcsi` binary
 | `rvcsi events <file.rvcsi> [--json]` | Replay through `SignalPipeline` + the event detectors and print the `CsiEvent`s. |
 | `rvcsi health --source <file\|replay\|nexmon> [--target <path>]` | Open a source, drain it, print its `SourceHealth` as JSON. |
 | `rvcsi calibrate --in <file.rvcsi> [--out baseline.json]` | Learn a v0 per-subcarrier baseline (mean amplitude) from a capture. |
+| `rvcsi simulate-fusion [--json --include-p0-edge-only] [--channel-sounding]` | Generate deterministic BLE replay/RSSI geometry plus a WiFi CSI crossing. The exact crossing abstains and the next unambiguous sample rebinds. Channel Sounding is identity-free, RVCS-bounded, grouped, and attributed to a separate future radio. Full JSON contains P0 respiratory/phase primitives and therefore requires the explicit edge-only assertion; human output is safe counters. |
 | `rvcsi export ruvector …` | Export a capture's windows/events into an RF-memory store (JSONL). |
 
 Licensed under MIT OR Apache-2.0.

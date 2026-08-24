@@ -36,6 +36,148 @@ export type CsiEventKind =
   | 'AnomalyDetected'
   | 'CalibrationRequired';
 
+/** Publication decision for a fused event. */
+export type EventDisposition = 'observed' | 'degraded' | 'abstained';
+
+/** Measurement a source can actually produce. */
+export type SourceCapability =
+  | 'wifi_csi_phase_amplitude'
+  | 'ble_advertisement_rssi'
+  | 'ble_direction_finding_cte_iq'
+  | 'bluetooth_channel_sounding_phase_timing';
+
+/** Whether an evidence item may support the requested interpretation. */
+export type EvidenceQuality = 'usable' | 'degraded' | 'abstained';
+
+/** Governance classification; exact micro-motion and phase/timing primitives are P0. */
+export type PrivacyClass = 'P0' | 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
+
+/** Machine-readable reason for quality reduction or abstention. */
+export type QualityReason =
+  | 'track_ambiguity'
+  | 'motion_contamination'
+  | 'evidence_expired'
+  | 'spoof_suspected'
+  | 'low_signal'
+  | 'unsupported_capability'
+  | 'unauthenticated_source';
+
+/** Lifetime and replay assessment for a rotating token. */
+export type TokenStatus = 'valid' | 'expired' | 'spoof_suspected';
+
+/** Host verification result for the firmware telemetry record. */
+export type TokenAuthentication = 'authenticated' | 'unauthenticated' | 'invalid';
+
+/** Decimal u64 value that preserves all 64 bits through JSON. */
+export type UInt64String = string;
+
+/** Canonical, nonzero decimal representation of a u32. */
+export type UInt32DecimalString = string;
+
+/** Decimal nanosecond value that preserves all 64 bits through JSON. */
+export type Nanoseconds = UInt64String;
+
+/** `blep:` followed by exactly 64 lowercase hexadecimal digest characters. */
+export type PseudonymousToken = `blep:${string}`;
+
+/** Cooperative role in a Bluetooth Channel Sounding procedure. */
+export type ChannelSoundingRole = 'initiator' | 'reflector';
+
+/** Metadata retained only after verifying the enrolled RuView/GW/v1 envelope. */
+export interface VerifiedGatewayEnvelope {
+  contract: 'RuView/GW/v1';
+  gateway_node_id: number;
+  gateway_key_id: number;
+  gateway_sequence: number;
+  gateway_boot_nonce: UInt64String;
+  received_at_boot_us: UInt64String;
+  timing_uncertainty_us: number;
+}
+
+/** Payload for a WiFi CSI track observation. */
+export interface WifiCsiTrackEvidence {
+  kind: 'wifi_csi_track';
+  track_token: string;
+  position_x_m: number;
+  track_ambiguity: number;
+  respiratory_component: number;
+  motion_contaminated: boolean;
+}
+
+/** BLE advertisement RSSI and rotating identity-token evidence. */
+export interface BleAdvertisementRssiEvidence {
+  kind: 'ble_advertisement_rssi';
+  pseudonymous_token: PseudonymousToken;
+  rssi_dbm: number;
+  /** Decimal u64 string, exact in JavaScript. */
+  token_expires_at_ns: Nanoseconds;
+  /** Decimal u64 string authenticated with the telemetry record. */
+  token_epoch: UInt64String;
+  source_sequence: number;
+  token_status: TokenStatus;
+  authentication: TokenAuthentication;
+  /** Required exactly when authentication is `authenticated`. */
+  gateway_envelope: VerifiedGatewayEnvelope | null;
+}
+
+/** One calibrated, unique frequency step in a grouped sounding procedure. */
+export interface ChannelSoundingStep {
+  /** RVCS v1 Bluetooth RF channel, 0 through 78. */
+  channel_index: number;
+  /** Signed normalized phase in [-π, π) radians; P0 edge-only. */
+  phase_radians: number;
+  /** RVCS picoseconds divided by 1000, bounded to 0 through 250 ns; P0 edge-only. */
+  round_trip_time_ns: number;
+  quality: number;
+}
+
+/** Cooperative Bluetooth Channel Sounding phase and timing evidence. */
+export interface BluetoothChannelSoundingEvidence {
+  kind: 'bluetooth_channel_sounding';
+  /** RVCS carries no authenticated identity join. */
+  procedure_id: UInt32DecimalString;
+  /** Nonzero RuView source session, widened and encoded as an exact u64 string. */
+  source_session_id: UInt64String;
+  /** Step count declared by every companion record in this grouped procedure. */
+  procedure_step_count: number;
+  local_role: ChannelSoundingRole;
+  antenna_path: number;
+  calibration_id: string;
+  gateway_envelope: VerifiedGatewayEnvelope;
+  /** At least four unique calibrated channels. */
+  steps: ChannelSoundingStep[];
+}
+
+/** One confidence-scored, expiring measurement used by fusion. */
+export interface SensingEvidence {
+  source_id: string;
+  source_capability: SourceCapability;
+  /** Decimal u64 string, exact in JavaScript. */
+  timestamp_ns: Nanoseconds;
+  /** Decimal u64 string, exact in JavaScript. */
+  expires_at_ns: Nanoseconds;
+  confidence: number;
+  quality: EvidenceQuality;
+  privacy_class: PrivacyClass;
+  quality_reasons?: QualityReason[];
+  /** Present only in generated fixtures. */
+  synthetic_label?: string;
+  payload:
+    | WifiCsiTrackEvidence
+    | BleAdvertisementRssiEvidence
+    | BluetoothChannelSoundingEvidence;
+}
+
+/** Time-bounded association between a rotating identity token and RF track. */
+export interface TrackAssociation {
+  pseudonymous_token: PseudonymousToken;
+  track_token: string;
+  /** Governed range is 0.60 through 1.0. */
+  confidence: number;
+  /** Decimal u64 string, exact in JavaScript. */
+  expires_at_ns: Nanoseconds;
+}
+
 /** One normalized, validated CSI observation. */
 export interface CsiFrame {
   frame_id: number;
@@ -83,12 +225,22 @@ export interface CsiEvent {
   kind: CsiEventKind;
   session_id: number;
   source_id: string;
-  timestamp_ns: number;
+  /** Decimal u64 string, exact in JavaScript. */
+  timestamp_ns: Nanoseconds;
   confidence: number;
   evidence_window_ids: number[];
   calibration_version: string | null;
   /** Free-form JSON string of event metadata. */
   metadata_json: string;
+  /** Missing on captures created before the fusion contract. */
+  disposition?: EventDisposition;
+  quality_reasons?: QualityReason[];
+  sensing_evidence?: SensingEvidence[];
+  track_association?: TrackAssociation;
+  /** Present only in generated fixtures. */
+  synthetic_label?: string;
+  /** Decimal u64 string, exact in JavaScript. */
+  expires_at_ns?: Nanoseconds;
 }
 
 /** Health snapshot for a source. */
