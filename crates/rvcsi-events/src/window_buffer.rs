@@ -13,8 +13,11 @@ pub struct WindowBufferConfig {
     pub presence_threshold: f32,
 }
 
+/// Steepness of the `motion_energy` → `presence_score` logistic.
+const PRESENCE_STEEPNESS: f32 = 20.0;
+
 impl WindowBufferConfig {
-    /// Build a config with a default `presence_threshold` of `0.05`.
+    /// Build a config with a default `presence_threshold` of `0.02`.
     ///
     /// # Panics
     /// Panics if `max_frames < 2`.
@@ -23,7 +26,7 @@ impl WindowBufferConfig {
         WindowBufferConfig {
             max_frames,
             max_duration_ns,
-            presence_threshold: 0.05,
+            presence_threshold: 0.02,
         }
     }
 
@@ -54,6 +57,40 @@ pub struct WindowBuffer {
     qualities: Vec<f32>,
     /// Buffered timestamps (ns).
     timestamps: Vec<u64>,
+    /// Per-frame RMS magnitude of the raw I/Q, taken before any DSP stage
+    /// (DC removal zero-centres `amplitude`), used to make `motion_energy`
+    /// scale-relative.
+    scales: Vec<f32>,
+}
+
+/// RMS magnitude of a frame's raw I/Q (falls back to `amplitude` when the
+/// frame carries no I/Q). Unaffected by Hampel, smoothing and DC removal.
+fn frame_scale(frame: &CsiFrame) -> f32 {
+    let n = frame.i_values.len().min(frame.q_values.len());
+    let sq: f64 = if n > 0 {
+        (0..n)
+            .map(|k| {
+                let (i, q) = (frame.i_values[k] as f64, frame.q_values[k] as f64);
+                i * i + q * q
+            })
+            .sum::<f64>()
+            / n as f64
+    } else if !frame.amplitude.is_empty() {
+        frame
+            .amplitude
+            .iter()
+            .map(|a| (*a as f64) * (*a as f64))
+            .sum::<f64>()
+            / frame.amplitude.len() as f64
+    } else {
+        0.0
+    };
+    let rms = sq.sqrt() as f32;
+    if rms.is_finite() {
+        rms
+    } else {
+        0.0
+    }
 }
 
 impl WindowBuffer {
@@ -93,6 +130,7 @@ impl WindowBuffer {
             phases: Vec::new(),
             qualities: Vec::new(),
             timestamps: Vec::new(),
+            scales: Vec::new(),
         }
     }
 
@@ -124,6 +162,7 @@ impl WindowBuffer {
         self.phases.push(frame.phase.clone());
         self.qualities.push(frame.quality_score);
         self.timestamps.push(frame.timestamp_ns);
+        self.scales.push(frame_scale(frame));
 
         let reached_count = self.amplitudes.len() >= self.cfg.max_frames;
         let reached_duration = match (self.timestamps.first(), self.timestamps.last()) {
@@ -186,7 +225,8 @@ impl WindowBuffer {
             *v /= frame_count as f32;
         }
 
-        // Motion energy: mean over consecutive pairs of ||amp_b - amp_a||_2 / sqrt(n).
+        // Motion energy: mean over consecutive pairs of ||amp_b - amp_a||_2 / sqrt(n),
+        // divided by the window's mean per-frame RMS amplitude (below).
         let motion_energy = if frame_count < 2 || n == 0 {
             0.0
         } else {
@@ -203,14 +243,29 @@ impl WindowBuffer {
             }
             (acc / (frame_count - 1) as f64) as f32
         };
+        // Scale-relative, like the baseline drift detector: divide by the window's
+        // mean raw RMS magnitude so one count of radio noise means the same thing on ESP32
+        // int8 (amplitudes ~O(10)) as on Nexmon int16 (~O(1000)). An absolute
+        // threshold could only ever be right for one of them; at int16 scale it
+        // kept presence and motion on forever in an empty room.
+        let scale = if self.scales.is_empty() {
+            0.0
+        } else {
+            self.scales.iter().sum::<f32>() / self.scales.len() as f32
+        };
+        // 1e-3 floor, as in `relative_drift`: far below any real CSI amplitude.
+        let motion_energy = motion_energy / scale.max(1e-3);
         let motion_energy = if motion_energy.is_finite() && motion_energy >= 0.0 {
             motion_energy
         } else {
             0.0
         };
 
-        // Presence score: logistic of (motion_energy - threshold).
-        let z = (motion_energy - self.cfg.presence_threshold) * 8.0;
+        // Presence score: logistic of (motion_energy - threshold). With the
+        // scale-relative energy, centre 0.02 and steepness 20 keep the quiet floor
+        // at ~0.40 (what PresenceConfig's thresholds assume) and cross the 0.7
+        // on-threshold at ~6% relative frame-to-frame change.
+        let z = (motion_energy - self.cfg.presence_threshold) * PRESENCE_STEEPNESS;
         let presence_score = (1.0 / (1.0 + (-z).exp())).clamp(0.0, 1.0);
 
         // Quality score: mean of frame quality scores.
@@ -252,6 +307,7 @@ impl WindowBuffer {
         self.phases.clear();
         self.qualities.clear();
         self.timestamps.clear();
+        self.scales.clear();
 
         window
     }
