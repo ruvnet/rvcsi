@@ -135,10 +135,29 @@ const FIVE_GHZ_CHANNELS: &[u16] = &[
     149, 153, 157, 161, 165,
 ];
 
+/// 5 GHz centre channels of the bonded 40 / 80 / 160 MHz blocks. A d11ac
+/// chanspec carries the *centre* channel for a bonded block (`makecsiparams -c
+/// 36/80` yields `0xe02a`, channel 42), so a 40/80/160 MHz capture reports these
+/// rather than the control channel.
+const FIVE_GHZ_CENTER_40: &[u16] = &[38, 46, 54, 62, 102, 110, 118, 126, 134, 142, 151, 159];
+const FIVE_GHZ_CENTER_80: &[u16] = &[42, 58, 106, 122, 138, 155];
+const FIVE_GHZ_CENTER_160: &[u16] = &[50, 114, 163];
+
 fn channels_for(chip: NexmonChip) -> Vec<u16> {
+    // 1..=13 already covers the 2.4 GHz 40 MHz centre channels (3..=11).
     let mut v: Vec<u16> = (1..=13).collect();
     if chip.dual_band() {
         v.extend_from_slice(FIVE_GHZ_CHANNELS);
+        let bws = bandwidths_for(chip);
+        for (bw, centers) in [
+            (40, FIVE_GHZ_CENTER_40),
+            (80, FIVE_GHZ_CENTER_80),
+            (160, FIVE_GHZ_CENTER_160),
+        ] {
+            if bws.contains(&bw) {
+                v.extend_from_slice(centers);
+            }
+        }
     }
     v
 }
@@ -314,6 +333,9 @@ mod tests {
         assert_eq!(p.expected_subcarrier_counts, vec![64, 128, 256]);
         assert!(p.accepts_channel(36)); // 5 GHz
         assert!(p.accepts_channel(6)); // 2.4 GHz
+        assert!(p.accepts_channel(38)); // 5 GHz 36/40 centre
+        assert!(p.accepts_channel(42)); // 5 GHz 36/80 centre (chanspec 0xe02a)
+        assert!(!p.accepts_channel(50)); // 160 MHz centre: not a BCM43455c0 width
         assert!(p.accepts_subcarrier_count(256)); // VHT80
         assert!(!p.accepts_subcarrier_count(57));
         assert!(p.supports_monitor_mode && p.supports_injection);
