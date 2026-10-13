@@ -698,7 +698,9 @@ mod tests {
     #[test]
     fn nexmon_pcap_record_and_inspect_roundtrip() {
         use rvcsi_adapter_nexmon::NexmonCsiHeader;
-        let chanspec = 0xc000u16 | 0x2000 | 36; // 5 GHz ch36 80 MHz
+        // 5 GHz 36/80 as nexmon_csi encodes it (`makecsiparams -c 36/80`): a d11ac
+        // chanspec carries the 80 MHz block's centre channel, 42.
+        let chanspec = 0xe02au16;
         let nsub = 256u16;
         let frames: Vec<(u64, NexmonCsiHeader, Vec<f32>, Vec<f32>)> = (0..8u64)
             .map(|k| {
@@ -738,7 +740,7 @@ mod tests {
         // (the Raspberry Pi 3B+/4/400/5 chip)
         let human = run(|o| inspect_nexmon(o, pcap_path, None, false));
         assert!(human.contains("CSI frames   : 8"), "{human}");
-        assert!(human.contains("channels     : [36]"));
+        assert!(human.contains("channels     : [42]"));
         assert!(human.contains("0x4345"));
         assert!(human.contains("chip         : bcm43455c0"), "{human}");
         let j = run(|o| inspect_nexmon(o, pcap_path, None, true));
@@ -748,7 +750,7 @@ mod tests {
         assert_eq!(v["detected_chip"], "bcm43455c0");
         assert_eq!(v["chip_names"][0], "bcm43455c0");
 
-        // record --source nexmon-pcap --chip pi5 -> .rvcsi; the 256-sc VHT80 ch36
+        // record --source nexmon-pcap --chip pi5 -> .rvcsi; the 256-sc VHT80 36/80 (centre 42)
         // frames all fit a Raspberry Pi 5 (BCM43455c0)
         let cap_file = tempfile::NamedTempFile::new().unwrap();
         let cap_path = cap_file.path().to_str().unwrap();
@@ -762,7 +764,7 @@ mod tests {
         let summary = run(|o| inspect(o, cap_path, false));
         assert!(summary.contains("frames       : 8"));
         assert!(summary.contains("source       : nx-pcap"));
-        assert!(summary.contains("channels     : [36]"));
+        assert!(summary.contains("channels     : [42]"));
         assert!(summary.contains("pi5"), "{summary}"); // the Pi 5 profile was stamped on the capture
 
         // --chip pizero2w (2.4 GHz only, ≤128 sc) drops every 256-sc frame

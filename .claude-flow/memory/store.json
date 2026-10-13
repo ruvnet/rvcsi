@@ -1,0 +1,59 @@
+{
+  "entries": {
+    "cmd-1791829588368": {
+      "key": "cmd-1791829588368",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi && git fetch -q origin && gh repo fork ruvnet/rvcsi --clone=false 2>&1 | tail -1; git remote add fork https://github.com/martinvlad/rvcsi.git 2>/dev/null; git worktree add -q -b fix/nexmon-center-channels ../rvcsi.wt-chan origin/main && cd ../rvcsi.wt-chan && git log --oneline -1 && sed -n 125,170p crates/rvcsi-adapter-nexmon/src/chips.rs && sed -n 295,330p crates/rvcsi-adapter-nexmon/src/chips.rs\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:26:28.368Z",
+      "lastAccessed": "2026-10-12T18:26:28.368Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:26:28.368Z"
+    },
+    "cmd-1791829600169": {
+      "key": "cmd-1791829600169",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi.wt-chan && python3 - <<'EOF'\\np='crates/rvcsi-adapter-nexmon/src/chips.rs'\\ns=open(p).read()\\nold='''fn channels_for(chip: NexmonChip) -> Vec<u16> {\\n    let mut v: Vec<u16> = (1..=13).collect();\\n    if chip.dual_band() {\\n        v.extend_from_slice(FIVE_GHZ_CHANNELS);\\n    }\\n    v\\n}\\n'''\\nnew='''/// 5 GHz centre channels of the bonded 40 / 80 / 160 MHz blocks. A d11ac\\n/// chanspec carries the *centre* channel for a bonded block (`makecsiparams -c\\n/// 36/80` yields `0xe02a`, channel 42), so a 40/80/160 MHz capture reports these\\n/// rather than the control channel.\\nconst FIVE_GHZ_CENTER_40: &[u16] = &[38, 46, 54, 62, 102, 110, 118, 126, 134, 142, 151, 159];\\nconst FIVE_GHZ_CENTER_80: &[u16] = &[42, 58, 106, 122, 138, 155];\\nconst FIVE_GHZ_CENTER_160: &[u16] = &[50, 114, 163];\\n\\nfn channels_for(chip: NexmonChip) -> Vec<u16> {\\n    // 1..=13 already covers the 2.4 GHz 40 MHz centre channels (3..=11).\\n    let mut v: Vec<u16> = (1..=13).collect();\\n    if chip.dual_band() {\\n        v.extend_from_slice(FIVE_GHZ_CHANNELS);\\n        let bws = bandwidths_for(chip);\\n        for (bw, centers) in [\\n            (40, FIVE_GHZ_CENTER_40),\\n            (80, FIVE_GHZ_CENTER_80),\\n            (160, FIVE_GHZ_CENTER_160),\\n        ] {\\n            if bws.contains(&bw) {\\n                v.extend_from_slice(centers);\\n            }\\n        }\\n    }\\n    v\\n}\\n'''\\nassert old in s; s=s.replace(old,new)\\nold2='''        assert!(p.accepts_channel(6)); // 2.4 GHz\\n'''\\nnew2='''        assert!(p.accepts_channel(6)); // 2.4 GHz\\n        assert!(p.accepts_channel(38)); // 5 GHz 36/40 centre\\n        assert!(p.accepts_channel(42)); // 5 GHz 36/80 centre (chanspec 0xe02a)\\n        assert!(!p.accepts_channel(50)); // 160 MHz centre: not a BCM43455c0 width\\n'''\\nassert old2 in s; s=s.replace(old2,new2,1)\\nopen(p,'w').write(s)\\nEOF\\ngrep -n \\\"Bcm4375b1\\\\|dual_band\\\" crates/rvcsi-adapter-nexmon/src/chips.rs | head\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:26:40.169Z",
+      "lastAccessed": "2026-10-12T18:26:40.169Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:26:40.169Z"
+    },
+    "cmd-1791829615298": {
+      "key": "cmd-1791829615298",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi.wt-chan && python3 - <<'EOF'\\np='crates/rvcsi-cli/src/commands.rs'\\ns=open(p).read()\\na='        let chanspec = 0xc000u16 | 0x2000 | 36; // 5 GHz ch36 80 MHz\\\\n'\\nb='        // 5 GHz 36/80 as nexmon_csi encodes it (`makecsiparams -c 36/80`): a d11ac\\\\n        // chanspec carries the 80 MHz block\\\\'s centre channel, 42.\\\\n        let chanspec = 0xe02au16;\\\\n'\\nassert a in s; s=s.replace(a,b)\\nn=s.count('channels     : [36]')\\ni=s.index(b)\\nhead,tail=s[:i],s[i:]\\n# replace only within this test: up to next \\\"#[test]\\\"\\nj=tail.index('#[test]') if '#[test]' in tail else len(tail)\\nseg=tail[:j].replace('channels     : [36]','channels     : [42]').replace('VHT80 ch36','VHT80 36/80 (centre 42)')\\ns=head+seg+tail[j:]\\nopen(p,'w').write(s)\\nprint(n)\\nEOF\\ngit diff --stat; cargo test -q -p rvcsi-cli -p rvcsi-adapter-nexmon 2>&1 | grep -E \\\"test result|FAILED|panicked\\\" \",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:26:55.298Z",
+      "lastAccessed": "2026-10-12T18:26:55.298Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:26:55.298Z"
+    },
+    "cmd-1791829627963": {
+      "key": "cmd-1791829627963",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi.wt-chan && cp crates/rvcsi-adapter-nexmon/src/chips.rs /private/tmp/claude-501/-Users-vlad-cognitum-one/31fda04e-998a-49bb-9b65-32ad90c6af76/scratchpad/rv/chips.fixed && git diff crates/rvcsi-adapter-nexmon/src/chips.rs > /private/tmp/claude-501/-Users-vlad-cognitum-one/31fda04e-998a-49bb-9b65-32ad90c6af76/scratchpad/rv/chips.diff && python3 - <<'EOF'\\n# revert only the channels_for body, keep the new test assertions\\np='crates/rvcsi-adapter-nexmon/src/chips.rs'; s=open(p).read()\\ns=s.replace('        let bws = bandwidths_for(chip);','        let bws: Vec<u16> = vec![];')\\nopen(p,'w').write(s)\\nEOF\\ncargo test -q -p rvcsi-cli -p rvcsi-adapter-nexmon 2>&1 | grep -E \\\"test result|panicked|^    [a-z_:]+$\\\" | head; cp /private/tmp/claude-501/-Users-vlad-cognitum-one/31fda04e-998a-49bb-9b65-32ad90c6af76/scratchpad/rv/chips.fixed crates/rvcsi-adapter-nexmon/src/chips.rs; git diff --stat\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:27:07.963Z",
+      "lastAccessed": "2026-10-12T18:27:07.963Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:27:07.963Z"
+    },
+    "cmd-1791829645206": {
+      "key": "cmd-1791829645206",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi.wt-chan && sed -i '' 's/        let bws = bandwidths_for(chip);/        let bws: Vec<u16> = vec![];/' crates/rvcsi-adapter-nexmon/src/chips.rs && cargo test -q -p rvcsi-cli 2>&1 | grep -E \\\"test result|panicked\\\" | head -3; cp /private/tmp/claude-501/-Users-vlad-cognitum-one/31fda04e-998a-49bb-9b65-32ad90c6af76/scratchpad/rv/chips.fixed crates/rvcsi-adapter-nexmon/src/chips.rs; cargo fmt --all -- --check && echo fmt-ok; cargo clippy --workspace -q -- -D warnings 2>&1 | tail -3; cargo test --workspace -q 2>&1 | grep \\\"test result\\\" | awk '{p+=$4;f+=$6} END{print \\\"passed\\\",p,\\\"failed\\\",f}'\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:27:25.206Z",
+      "lastAccessed": "2026-10-12T18:27:25.206Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:27:25.206Z"
+    },
+    "cmd-1791829653562": {
+      "key": "cmd-1791829653562",
+      "value": "{\"command\":\"cd ~/cognitum-one/rvcsi.wt-chan && cargo build -q -p rvcsi-cli && S=/private/tmp/claude-501/-Users-vlad-cognitum-one/31fda04e-998a-49bb-9b65-32ad90c6af76/scratchpad/rv; ./target/debug/rvcsi record --source nexmon-pcap --in $S/pi5_80.pcap --out $S/p5fixed.rvcsi --chip pi5 && ./target/debug/rvcsi inspect $S/p5fixed.rvcsi | grep -E \\\"frames|channels|subcarriers\\\"\",\"exitCode\":0,\"success\":true}",
+      "namespace": "commands",
+      "storedAt": "2026-10-12T18:27:33.562Z",
+      "lastAccessed": "2026-10-12T18:27:33.562Z",
+      "accessCount": 0,
+      "expiresAt": "2026-11-11T18:27:33.562Z"
+    }
+  },
+  "version": "3.0.0"
+}
