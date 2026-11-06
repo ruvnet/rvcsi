@@ -647,4 +647,107 @@ mod tests {
         assert_eq!(s.first_timestamp_ns, 1_000_000_000);
         assert!(s.last_timestamp_ns > s.first_timestamp_ns);
     }
+
+    /// #6: through the real `events` path (default DSP: Hampel, smoothing, DC
+    /// removal), an empty room at a radio's own amplitude scale must stay quiet,
+    /// and a moving one must still raise and clear presence and motion.
+    fn write_radio_capture(
+        path: &std::path::Path,
+        base: f32,
+        flat: bool,
+        noise: f32,
+        moving: bool,
+    ) {
+        let header = CaptureHeader::new(
+            SessionId(1),
+            SourceId::from("it"),
+            AdapterProfile::offline(AdapterKind::File),
+        );
+        let mut rec = FileRecorder::create(path, &header).unwrap();
+        let mut state = 0x5eed_u64;
+        let mut unit = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((state >> 40) as f32) / (1u64 << 24) as f32
+        };
+        for k in 0..1000usize {
+            // A moving reflector shifts the multipath pattern across subcarriers.
+            let shift = if moving && (300..700).contains(&k) {
+                (unit() - 0.5) * 1.0
+            } else {
+                0.0
+            };
+            let i: Vec<f32> = (0..64)
+                .map(|s| {
+                    let s = s as f32;
+                    let profile = if flat {
+                        base
+                    } else {
+                        base * (1.0
+                            + 0.375 * (0.15 * s + shift).sin()
+                            + 0.1875 * (0.41 * s - shift).cos())
+                    };
+                    let g = (unit() + unit() + unit() - 1.5) * 2.0;
+                    (profile + g * noise).round()
+                })
+                .collect();
+            let q = vec![0.0; 64];
+            let mut f = CsiFrame::from_iq(
+                FrameId(k as u64),
+                SessionId(1),
+                SourceId::from("it"),
+                AdapterKind::File,
+                1_000 + k as u64 * 10_000_000,
+                6,
+                20,
+                i,
+                q,
+            );
+            f.validation = ValidationStatus::Accepted;
+            rec.write_frame(&f).unwrap();
+        }
+        rec.finish().unwrap();
+    }
+
+    #[test]
+    fn events_track_the_room_at_real_radio_scales() {
+        use rvcsi_core::CsiEventKind as K;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("radio.rvcsi");
+        let kinds = |base, flat, noise, moving| {
+            write_radio_capture(&path, base, flat, noise, moving);
+            events_from_capture(path.to_str().unwrap())
+                .unwrap()
+                .into_iter()
+                .map(|e| e.kind)
+                .collect::<Vec<_>>()
+        };
+        for (base, flat, noise) in [
+            (800.0, false, 1.0),
+            (800.0, false, 10.0),
+            (32.0, false, 0.5),
+            (1000.0, true, 10.0),
+        ] {
+            let quiet = kinds(base, flat, noise, false);
+            assert!(
+                !quiet.contains(&K::PresenceStarted) && !quiet.contains(&K::MotionDetected),
+                "empty room base {base} flat {flat} noise {noise}: {quiet:?}"
+            );
+        }
+        for (base, noise) in [(800.0, 1.0), (800.0, 10.0)] {
+            let moving = kinds(base, false, noise, true);
+            for want in [
+                K::MotionDetected,
+                K::MotionSettled,
+                K::PresenceStarted,
+                K::PresenceEnded,
+            ] {
+                assert!(
+                    moving.contains(&want),
+                    "moving room base {base} noise {noise}: missing {want:?} in {moving:?}"
+                );
+            }
+        }
+    }
 }

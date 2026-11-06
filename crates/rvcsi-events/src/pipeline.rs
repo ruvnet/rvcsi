@@ -186,6 +186,71 @@ mod tests {
         frames
     }
 
+    /// #6: a frequency-selective profile at a real radio's amplitude scale
+    /// (Nexmon int16 ~800 counts, ESP32 int8 ~32) with integer-count noise.
+    /// `moving` shifts the multipath pattern per frame for frames 300..700.
+    fn radio_stream(base: f32, noise: f32, moving: bool, seed: u64) -> Vec<CsiFrame> {
+        let mut rng = Lcg::new(seed);
+        (0..1000u64)
+            .map(|k| {
+                // A moving reflector shifts the multipath pattern across subcarriers.
+                let shift = if moving && (300..700).contains(&k) {
+                    rng.next_unit() - 0.5
+                } else {
+                    0.0
+                };
+                let amp: Vec<f32> = (0..64)
+                    .map(|i| {
+                        let i = i as f32;
+                        let profile = base
+                            * (1.0
+                                + 0.375 * (0.15 * i + shift).sin()
+                                + 0.1875 * (0.41 * i - shift).cos());
+                        // Sum of 3 uniforms ~ Gaussian, scaled to roughly `noise` std-dev.
+                        let g = (rng.next_unit() + rng.next_unit() + rng.next_unit() - 1.5) * 2.0;
+                        profile + g * noise
+                    })
+                    .collect();
+                accepted_frame(k, k * 10_000_000, &amp, 0.9)
+            })
+            .collect()
+    }
+
+    fn kinds(events: &[CsiEvent]) -> Vec<CsiEventKind> {
+        events.iter().map(|e| e.kind).collect()
+    }
+
+    #[test]
+    fn empty_room_at_radio_scale_raises_no_presence_or_motion() {
+        for (base, noise) in [(800.0, 1.0), (800.0, 3.0), (800.0, 10.0), (32.0, 0.3)] {
+            let k = kinds(&run_stream(&radio_stream(base, noise, false, 7)));
+            assert!(
+                !k.contains(&CsiEventKind::PresenceStarted)
+                    && !k.contains(&CsiEventKind::MotionDetected),
+                "static room at base {base}, noise {noise}: {k:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn motion_at_radio_scale_is_detected_and_settles() {
+        // Undenoised frames: up to ~0.4% noise (the DSP path, tested in rvcsi-runtime, smooths more).
+        for (base, noise) in [(800.0, 1.0), (800.0, 3.0), (32.0, 0.1)] {
+            let k = kinds(&run_stream(&radio_stream(base, noise, true, 11)));
+            for want in [
+                CsiEventKind::MotionDetected,
+                CsiEventKind::MotionSettled,
+                CsiEventKind::PresenceStarted,
+                CsiEventKind::PresenceEnded,
+            ] {
+                assert!(
+                    k.contains(&want),
+                    "moving room at base {base}, noise {noise}: missing {want:?} in {k:?}"
+                );
+            }
+        }
+    }
+
     fn run_stream(frames: &[CsiFrame]) -> Vec<CsiEvent> {
         let mut p = EventPipeline::with_defaults(SessionId(1), SourceId::from("dev"));
         let mut events = Vec::new();
