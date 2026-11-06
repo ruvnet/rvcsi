@@ -63,9 +63,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "bitflags"
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-adapter-esp32"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-core",
  "serde",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-adapter-file"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-core",
  "serde",
@@ -513,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-adapter-nexmon"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cc",
  "rvcsi-core",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-cli"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -538,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-dsp"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-core",
  "serde",
@@ -557,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-events"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-core",
  "serde",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-node"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "napi",
  "napi-build",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-runtime"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-adapter-esp32",
  "rvcsi-adapter-file",
@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "rvcsi-ruvector"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rvcsi-core",
  "serde",

@@ -4,6 +4,30 @@ All notable changes to rvCSI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-06
+
+### Fixed
+
+- `rvcsi-events`: presence and motion no longer fire on an empty room and
+  stay on at real radio amplitude scales (#6, #7). `WindowMetrics::motion_energy`
+  is now scale-relative: the mean frame-to-frame RMS amplitude change divided by
+  the window's mean raw I/Q RMS magnitude, like the baseline drift detector. One
+  count of noise now means the same on ESP32 int8 as on Nexmon int16 captures.
+- Regression tests drive the event pipeline and the `events` capture path with
+  int16- and int8-scale frames and realistic noise, static and moving.
+
+### Changed
+
+- `WindowBufferConfig::presence_threshold` defaults to `0.02` (was `0.05`),
+  and the presence logistic steepness rises from 8 to 20. Callers that set
+  `presence_threshold` or `MotionConfig` thresholds by hand were tuning raw
+  amplitude counts and must re-tune them for the relative energy.
+
+### Security
+
+- `Cargo.lock`: `anyhow` 1.0.102 → 1.0.104 (RUSTSEC-2026-0190). Only the
+  `rvcsi-cli` binary depends on it.
+
 ## [0.4.0] — 2026-10-12
 
 ### Added
